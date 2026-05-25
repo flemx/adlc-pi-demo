@@ -1,13 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { slides } from "./slides";
+import { slides, type SlideContext } from "./slides";
 
-type Props = {
-  goToTerminal: () => void;
-};
+type Props = SlideContext;
 
-export function SlideDeck({ goToTerminal }: Props) {
+export function SlideDeck(props: Props) {
   const [idx, setIdx] = React.useState(0);
   const total = slides.length;
 
@@ -17,10 +15,8 @@ export function SlideDeck({ goToTerminal }: Props) {
   const next = React.useCallback(() => go(idx + 1), [go, idx]);
   const prev = React.useCallback(() => go(idx - 1), [go, idx]);
 
-  // Keyboard navigation
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Don't hijack typing in inputs or the iframe terminal
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
       if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") {
@@ -29,17 +25,14 @@ export function SlideDeck({ goToTerminal }: Props) {
       } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
         e.preventDefault();
         prev();
-      } else if (e.key === "Home") {
-        go(0);
-      } else if (e.key === "End") {
-        go(total - 1);
-      }
+      } else if (e.key === "Home") go(0);
+      else if (e.key === "End") go(total - 1);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [next, prev, go, total]);
 
-  const ctx = React.useMemo(() => ({ goToTerminal }), [goToTerminal]);
+  const ctx = React.useMemo<SlideContext>(() => props, [props]);
 
   return (
     <div className="deck">
@@ -56,9 +49,7 @@ export function SlideDeck({ goToTerminal }: Props) {
       </div>
 
       <div className="controls">
-        <button className="btn" onClick={prev} aria-label="Previous slide">
-          ← Prev
-        </button>
+        <button className="btn" onClick={prev} aria-label="Previous slide">← Prev</button>
 
         <div className="progress">
           <div className="dot-nav" role="tablist">
@@ -76,6 +67,7 @@ export function SlideDeck({ goToTerminal }: Props) {
           </div>
           <div className="counter">
             {String(idx + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
+            <span className="muted mono"> · {slides[idx].label}</span>
           </div>
         </div>
 

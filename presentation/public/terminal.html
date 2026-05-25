@@ -185,6 +185,14 @@
       let ws;
       let reconnectTimer;
 
+      function notifyParentReady() {
+        try {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: 'ready' }, location.origin);
+          }
+        } catch {}
+      }
+
       function connect() {
         const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
         const url = `${proto}//${location.host}/ws?cols=${term.cols}&rows=${term.rows}`;
@@ -193,6 +201,7 @@
         ws.onopen = () => {
           setStatus(true, `live · ${backend}`);
           term.focus();
+          notifyParentReady();
         };
         ws.onmessage = (ev) => term.write(typeof ev.data === 'string' ? ev.data : new Uint8Array(ev.data));
         ws.onerror = () => setStatus(false, 'error');
@@ -207,6 +216,23 @@
       term.onResize(({ cols, rows }) => {
         if (ws && ws.readyState === 1) {
           ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+        }
+      });
+
+      // ---- Parent control channel (postMessage) ------------------------------
+      // The Next.js shell pushes commands here when a slide "Run in pi" button is
+      // clicked. We just type into the live PTY — same as a presenter typing it.
+      window.addEventListener('message', (ev) => {
+        if (ev.origin !== location.origin) return;
+        const msg = ev.data;
+        if (!msg || typeof msg !== 'object') return;
+        if (msg.type === 'run' && typeof msg.cmd === 'string') {
+          if (!ws || ws.readyState !== 1) return;
+          // Carriage return triggers Enter inside the PTY.
+          ws.send(msg.cmd + '\r');
+          term.focus();
+        } else if (msg.type === 'interrupt') {
+          if (ws && ws.readyState === 1) ws.send('\u0003'); // Ctrl-C
         }
       });
 

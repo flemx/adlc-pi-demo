@@ -7,6 +7,7 @@
 import { createServer } from 'node:http';
 import { parse } from 'node:url';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import next from 'next';
 import { WebSocketServer } from 'ws';
@@ -19,13 +20,41 @@ const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOST || '0.0.0.0';
 const port = Number(process.env.PORT || 3000);
 
-// Spawn `pi` in the SFDX project root (parent of presentation/)
+// Spawn a shell in the SFDX project root (parent of presentation/).
+// Default is the user's $SHELL so the demo can drive it with `pi "..."`.
 const PROJECT_ROOT = path.resolve(__dirname, '..');
-const SHELL_CMD = process.env.PI_CMD || 'pi';
-const SHELL_ARGS = (process.env.PI_ARGS || '').split(' ').filter(Boolean);
+const DEFAULT_SHELL =
+  process.env.SHELL ||
+  (process.platform === 'win32' ? 'powershell.exe' : '/bin/zsh');
+const SHELL_CMD = process.env.PI_CMD || DEFAULT_SHELL;
+const SHELL_ARGS = (process.env.PI_ARGS ?? '-l').split(' ').filter(Boolean);
+
+// Make sure /planning exists with a friendly placeholder so the file explorer
+// has something to show before the agent writes its first artefact.
+const PLANNING_DIR = path.join(PROJECT_ROOT, 'planning');
+try {
+  fs.mkdirSync(PLANNING_DIR, { recursive: true });
+  const readme = path.join(PLANNING_DIR, 'README.md');
+  if (!fs.existsSync(readme)) {
+    fs.writeFileSync(
+      readme,
+      [
+        '# planning/',
+        '',
+        'This folder will be populated by `pi` during the **planning** phase of',
+        'the demo. Watch this space — a styled HTML deflection report will appear',
+        'here once the agent finishes its case analysis.',
+        '',
+      ].join('\n'),
+    );
+  }
+} catch (e) {
+  console.warn('[planning] could not bootstrap planning dir:', e.message);
+}
 
 console.log(`[pty] cwd  : ${PROJECT_ROOT}`);
 console.log(`[pty] cmd  : ${SHELL_CMD} ${SHELL_ARGS.join(' ')}`);
+console.log(`[plan] dir : ${PLANNING_DIR}`);
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();

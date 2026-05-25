@@ -1,10 +1,92 @@
 import * as React from "react";
 
+export type SlideContext = {
+  goToTerminal: () => void;
+  goToPlanning: () => void;
+  runInPi: (prompt: string) => void;
+};
+
+/** Salesforce org Cases list URL — opened in a new tab from the Plan slide. */
+export const ORG_CASES_URL =
+  "https://orgfarm-22ccc7c65d.lightning.force.com/lightning/o/Case/list?filterName=AllOpenCases";
+
 export type Slide = {
   id: string;
   label: string;       // shown in dot-nav tooltip
-  render: (ctx: { goToTerminal: () => void }) => React.ReactNode;
+  render: (ctx: SlideContext) => React.ReactNode;
 };
+
+// ── prompts ────────────────────────────────────────────────────────────────
+
+export const PLAN_PROMPT = `You are sf-pi running inside a Salesforce DX project. Goal: surface case-deflection opportunities for our support team.
+
+Steps:
+1. Use the sf CLI (sf data query --json) on the default org to pull the 5 most recently created Cases. Include Subject, Description, Status, Priority, Type, Reason, CreatedDate, Account.Name, and the most recent CaseComment if available.
+2. Analyse the cases for COMMON THEMES — repeating topics, things a self-service experience could resolve, and the cases that are best candidates for a service-agent deflection.
+3. Propose ONE Agentforce service agent that would deflect the largest share of these cases. Describe its topic, the 1–2 actions it should call, the data inputs, and the success metric.
+4. Save the full analysis as a polished, presentation-ready HTML report at planning/case-deflection-plan.html.
+   - Single self-contained file with inline CSS (no external network requests).
+   - Dark, modern aesthetic — Salesforce blue (#00a1e0) on near-black, subtle gradient accents, clean typography.
+   - Sections: executive summary, the 5 cases as cards, theme analysis, proposed agent design, and an "Actions to build" checklist.
+5. Print a one-line summary of where the report was saved.
+
+Read-only org calls only. Do not deploy or run any DML.`;
+
+export const BUILD_PROMPT = `You are sf-pi. Read planning/case-deflection-plan.html and build the proposed Agentforce service agent in this SFDX project. Keep the scope tiny — this is a live demo.
+
+Constraints:
+1. Read planning/case-deflection-plan.html first to understand the goal, topic and the proposed actions.
+2. Create exactly TWO stub Apex InvocableMethod actions in force-app/main/default/classes/. Each takes a small input payload (e.g. caseId, customerEmail) and returns a hard-coded confirmation object. No real DML, no SOQL writes. Add the metadata XML for both classes.
+3. Use the agentscript_authoring tools to create ONE service agent with EXACTLY ONE subagent. The subagent must call BOTH stub actions.
+4. The agent's reply instructions must format the action confirmations as a small block of styled HTML (inline CSS, dark theme, salesforce-blue accent) so the chat UI renders a nice confirmation card.
+5. Validate the agent locally (compile + structure check) and PUBLISH it.
+   DO NOT run preview, do not run eval — we will test the agent in the next phase of the demo.
+
+When done, print a one-line summary: agent api name, version number, activation status, and the path to each Apex class.`;
+
+// ── prompt block UI ────────────────────────────────────────────────────────
+
+function PromptBlock({
+  prompt,
+  onRun,
+  label = "Run in pi",
+  hint,
+}: { prompt: string; onRun: (p: string) => void; label?: string; hint?: string }) {
+  const [copied, setCopied] = React.useState(false);
+
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    } catch {}
+  };
+
+  return (
+    <div className="prompt">
+      <div className="prompt-head">
+        <span className="chip"><b>prompt for pi</b></span>
+        {hint && <span className="muted" style={{ fontSize: 12 }}>{hint}</span>}
+        <div className="prompt-actions">
+          <button className="btn" onClick={onCopy}>
+            {copied ? "✓ Copied" : "⧉ Copy prompt"}
+          </button>
+          <button className="btn primary" onClick={() => onRun(prompt)}>
+            ⚡ {label}
+          </button>
+        </div>
+      </div>
+      <pre className="prompt-body mono">{prompt}</pre>
+      <div className="prompt-foot mono">
+        <span className="muted">$</span>{" "}
+        <span className="prompt-cmd">pi</span>{" "}
+        <span className="muted">"…"</span>
+      </div>
+    </div>
+  );
+}
+
+// ── slides ─────────────────────────────────────────────────────────────────
 
 export const slides: Slide[] = [
   // ── 1 · Title ────────────────────────────────────────────────────────────
@@ -32,7 +114,7 @@ export const slides: Slide[] = [
           <span className="chip"><b>Headless 360</b></span>
           <span className="chip"><b>sf-pi</b> coding agent</span>
           <span className="chip"><b>MCP</b> · Salesforce DX · Agentforce</span>
-          <span className="chip">Live demo at the end →</span>
+          <span className="chip">Plan · Build · Test</span>
         </div>
       </div>
     ),
@@ -60,28 +142,19 @@ export const slides: Slide[] = [
             <div className="icon">⚡</div>
             <div className="card-eye">API-first</div>
             <h3>Every capability, an API</h3>
-            <p>
-              Read, write, configure, deploy. The platform answers JSON, not
-              just HTML.
-            </p>
+            <p>Read, write, configure, deploy. The platform answers JSON, not just HTML.</p>
           </div>
           <div className="card violet">
             <div className="icon">🧩</div>
             <div className="card-eye">MCP-native</div>
             <h3>Hosted MCP servers</h3>
-            <p>
-              Salesforce hosts Model Context Protocol servers. Claude Code,
-              Cursor, Codex connect with no custom integration work.
-            </p>
+            <p>Salesforce hosts Model Context Protocol servers. Claude Code, Cursor, Codex connect with no custom integration work.</p>
           </div>
           <div className="card teal">
             <div className="icon">⌨️</div>
             <div className="card-eye">CLI-driven</div>
             <h3>Salesforce DX, supercharged</h3>
-            <p>
-              <span className="mono">sf</span> is the universal lever. Auth,
-              metadata, deploy, anonymous Apex, Agentforce — all scriptable.
-            </p>
+            <p><span className="mono">sf</span> is the universal lever. Auth, metadata, deploy, anonymous Apex, Agentforce — all scriptable.</p>
           </div>
         </div>
       </div>
@@ -95,9 +168,7 @@ export const slides: Slide[] = [
     render: () => (
       <div className="slide-inner">
         <span className="eyebrow"><span className="pulse" /> Bring your own coding agent</span>
-        <h2 className="title-lg">
-          Salesforce + the agent of your choice.
-        </h2>
+        <h2 className="title-lg">Salesforce + the agent of your choice.</h2>
         <p className="kicker">
           Headless 360 doesn’t lock you into one vendor. Any tool that speaks
           MCP or shells out to <span className="mono">sf</span> can drive the
@@ -171,12 +242,7 @@ export const slides: Slide[] = [
             <div className="icon">🛰️</div>
             <div className="card-eye">Headless 360 native</div>
             <h3>MCP + sf CLI, governed</h3>
-            <p>
-              Connects to Salesforce-hosted MCP servers and your local{" "}
-              <span className="mono">sf</span> session. Production-org calls
-              gated by a guardrail that classifies dangerous and destructive
-              commands.
-            </p>
+            <p>Connects to Salesforce-hosted MCP servers and your local <span className="mono">sf</span> session. Production-org calls gated by a guardrail that classifies dangerous and destructive commands.</p>
           </div>
           <div className="card violet">
             <div className="icon">🧬</div>
@@ -194,19 +260,13 @@ export const slides: Slide[] = [
             <div className="icon">📡</div>
             <div className="card-eye">Data 360</div>
             <h3>Live data, queryable</h3>
-            <p>
-              Discover DMOs, run Data 360 SQL, inspect Agentforce STDM session
-              traces — straight from the prompt.
-            </p>
+            <p>Discover DMOs, run Data 360 SQL, inspect Agentforce STDM session traces — straight from the prompt.</p>
           </div>
           <div className="card pink">
             <div className="icon">🪟</div>
             <div className="card-eye">Browser fallback</div>
             <h3>UI when APIs end</h3>
-            <p>
-              Drives Lightning Setup with an accessibility-tree browser when
-              there’s no API yet. Last-mile, but still scripted.
-            </p>
+            <p>Drives Lightning Setup with an accessibility-tree browser when there’s no API yet. Last-mile, but still scripted.</p>
           </div>
         </div>
       </div>
@@ -219,79 +279,252 @@ export const slides: Slide[] = [
     label: "Dev loop",
     render: () => (
       <div className="slide-inner">
-        <span className="eyebrow"><span className="pulse" /> Vibe → Agent → Production</span>
-        <h2 className="title-lg">
-          One loop, six verbs.
-        </h2>
+        <span className="eyebrow"><span className="pulse" /> Plan · Build · Test</span>
+        <h2 className="title-lg">One loop, three phases.</h2>
         <p className="kicker">
-          You describe the agent. <span className="mono">pi</span> authors it,
-          compiles it, previews it against the live org, regression-tests it,
-          and ships it — without leaving the terminal.
+          For the rest of the demo we’ll walk this loop end-to-end against a
+          live org. <span className="mono">pi</span> plans by reading the org,
+          builds by scaffolding the agent, and tests by previewing it.
         </p>
 
-        <div className="flow">
-          {[
-            ["01", "Vibe",      "natural-language intent"],
-            ["02", "Author",    ".agent + topics"],
-            ["03", "Compile",   "structure + types"],
-            ["04", "Preview",   "live org, full trace"],
-            ["05", "Eval",      "regression spec"],
-            ["06", "Publish",   "activate version"],
-          ].map(([n, l, s]) => (
-            <div className="step" key={n}>
-              <div className="n">{n}</div>
-              <div className="l">{l}</div>
-              <div className="s">{s}</div>
-            </div>
-          ))}
+        <div className="flow flow-3">
+          <div className="step phase teal">
+            <div className="n">PHASE 01</div>
+            <div className="l">Plan</div>
+            <div className="s">Read the cases · find the deflection · write a plan</div>
+          </div>
+          <div className="step phase violet">
+            <div className="n">PHASE 02</div>
+            <div className="l">Build</div>
+            <div className="s">Scaffold actions · author agent · publish</div>
+          </div>
+          <div className="step phase pink">
+            <div className="n">PHASE 03</div>
+            <div className="l">Test</div>
+            <div className="s">Preview · eval · ship the version</div>
+          </div>
         </div>
 
-        <pre className="code-block" aria-label="terminal example">
-          <code>
-            {"  "}<span className="prompt">›</span> <span className="cmd">pi</span>{"\n"}
-            {"  "}<span className="com">{"// pi:"}</span> what would you like to build?{"\n"}
-            {"  "}<span className="prompt">›</span>{" "}
-            <span className="cmd">
-              An order-status agent that takes an OrderId, calls our MCP tool,
-              and routes to a human if SLA is breached.
-            </span>{"\n\n"}
-            {"  "}<span className="com">{"// pi runs:"}</span>{"\n"}
-            {"  "}<span className="cmd">agentscript_authoring</span>{"  verb=create  bundle_name=OrderStatus\n"}
-            {"  "}<span className="cmd">agentscript_authoring</span>{"  verb=compile mode=check\n"}
-            {"  "}<span className="cmd">agentscript_preview</span>{"     action=start  agent_file=…/OrderStatus.agent\n"}
-            {"  "}<span className="cmd">agentscript_eval</span>{"        action=run    spec_path=specs/order-status.json\n"}
-            {"  "}<span className="cmd">agentscript_lifecycle</span>{"   action=publish activate=true\n"}
-            {"  "}<span className="ok">✓ Agent activated · v3 · OrderStatusAgent</span>{"\n"}
-          </code>
-        </pre>
+        <div className="grid-3" style={{ marginTop: 8 }}>
+          <div className="card teal">
+            <div className="card-eye">Up next</div>
+            <h3>Plan · look at the org</h3>
+            <p>We’ll open the live org and look at the case backlog before asking pi to analyse it.</p>
+          </div>
+          <div className="card" style={{ opacity: 0.55 }}>
+            <div className="card-eye">Then</div>
+            <h3>Build · scaffold the agent</h3>
+            <p>pi reads the plan and writes Apex actions + an Agentforce service agent.</p>
+          </div>
+          <div className="card" style={{ opacity: 0.4 }}>
+            <div className="card-eye">Finally</div>
+            <h3>Test · validate live</h3>
+            <p>Preview the published agent against the org and watch it deflect.</p>
+          </div>
+        </div>
       </div>
     ),
   },
 
-  // ── 6 · Live demo CTA ────────────────────────────────────────────────────
+  // ── 6 · Plan · Look at the org ───────────────────────────────────────────
   {
-    id: "demo",
-    label: "Live demo",
-    render: ({ goToTerminal }) => (
-      <div className="slide-inner" style={{ textAlign: "center", justifyItems: "center" }}>
-        <span className="eyebrow"><span className="pulse" /> Now: hands on the keys</span>
-        <h2 className="title-xl" style={{ textAlign: "center" }}>
-          Let’s build it. <span className="grad">Live.</span>
+    id: "plan-look",
+    label: "Plan · Look at the org",
+    render: () => (
+      <div className="slide-inner">
+        <span className="eyebrow" style={{ color: "var(--teal)" }}>
+          <span className="pulse" /> Phase 01 · Plan · Step 1 of 3
+        </span>
+        <h2 className="title-lg">
+          First, let’s see what the team is dealing with.
         </h2>
-        <p className="kicker" style={{ textAlign: "center", marginInline: "auto" }}>
-          The next tab is a real terminal, mounted at the SFDX project root of
-          this Salesforce World Tour breakout. We’ll start with{" "}
-          <span className="mono">pi</span> — and vibe-code an Agentforce agent
-          end-to-end against a live org.
+        <p className="kicker">
+          Open the production org in a new tab and skim the open case list.
+          Real cases, real backlog — the raw input pi will plan against.
         </p>
-        <div className="row" style={{ justifyContent: "center", marginTop: 12 }}>
-          <button className="btn primary" onClick={goToTerminal}>
-            ⚡ Open the live terminal
-          </button>
-          <span className="chip">
-            press <span className="kbd">→</span> or <span className="kbd">2</span> to switch tabs
-          </span>
+
+        <div className="grid-2">
+          <div className="card teal">
+            <div className="icon">🏢</div>
+            <div className="card-eye">Live org</div>
+            <h3>Open Cases</h3>
+            <p>
+              <span className="mono">orgfarm-22ccc7c65d.lightning.force.com</span>
+              {" "}— the <span className="mono">AllOpenCases</span> list view.
+              Skim it, get a feel for the volume and the topics, then come
+              back to this tab.
+            </p>
+            <div className="row" style={{ marginTop: 14 }}>
+              <a
+                className="btn primary"
+                href={ORG_CASES_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                ↗ Open Cases in new tab
+              </a>
+              <span className="chip mono" style={{ fontSize: 11 }}>
+                lightning.force.com
+              </span>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-eye">What to notice</div>
+            <ul className="bullets">
+              <li><b>Recurring topics</b> — the same questions, asked five different ways</li>
+              <li><b>Self-service candidates</b> — anything a customer could resolve with one bot turn</li>
+              <li><b>Routing pain</b> — cases that bounce between queues before landing</li>
+            </ul>
+          </div>
         </div>
+      </div>
+    ),
+  },
+
+  // ── 7 · Plan · Analyse with pi ───────────────────────────────────────────
+  {
+    id: "plan-analyse",
+    label: "Plan · Analyse",
+    render: ({ runInPi }) => (
+      <div className="slide-inner">
+        <span className="eyebrow" style={{ color: "var(--teal)" }}>
+          <span className="pulse" /> Phase 01 · Plan · Step 2 of 3
+        </span>
+        <h2 className="title-lg">Now ask <span className="grad">pi</span> to analyse.</h2>
+        <p className="kicker">
+          One prompt, one verb. <span className="mono">pi</span> queries the
+          last 5 cases through the <span className="mono">sf</span> CLI, finds
+          the common themes, and writes a styled HTML deflection report into{" "}
+          <span className="mono">planning/</span>.
+        </p>
+
+        <PromptBlock
+          prompt={PLAN_PROMPT}
+          onRun={runInPi}
+          label="Run plan in pi"
+          hint="opens the Live demo tab and types pi '…' for you"
+        />
+      </div>
+    ),
+  },
+
+  // ── 8 · Plan · Review ────────────────────────────────────────────────────
+  {
+    id: "plan-review",
+    label: "Plan · Review",
+    render: ({ goToPlanning }) => (
+      <div className="slide-inner">
+        <span className="eyebrow" style={{ color: "var(--teal)" }}>
+          <span className="pulse" /> Phase 01 · Plan · Step 3 of 3
+        </span>
+        <h2 className="title-lg">Read the plan it wrote.</h2>
+        <p className="kicker">
+          When pi finishes, the new HTML report pops up in the Planning tab.
+          The file explorer is watching <span className="mono">planning/</span>
+          {" "}live — new files auto-select, HTML renders inline, Markdown
+          previews on the right.
+        </p>
+
+        <div className="grid-2">
+          <div className="card teal">
+            <div className="icon">📁</div>
+            <div className="card-eye">Planning workspace</div>
+            <h3>Project · planning/</h3>
+            <p>
+              File explorer + viewer. HTML renders in a sandboxed frame,
+              Markdown renders with a styled preview, and any file in{" "}
+              <span className="mono">planning/</span> created in the next 60
+              seconds will pop up automatically.
+            </p>
+            <div className="row" style={{ marginTop: 14 }}>
+              <button className="btn primary" onClick={goToPlanning}>
+                📁 Open the planning workspace
+              </button>
+              <span className="chip">opens the <b>Planning</b> tab</span>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-eye">What you should see</div>
+            <ul className="bullets">
+              <li>A polished, dark-themed HTML report</li>
+              <li>The 5 cases as cards with the recurring theme highlighted</li>
+              <li>A proposed agent design + an "actions to build" checklist — the input for the build phase</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    ),
+  },
+
+  // ── 9 · Build · Introduce ────────────────────────────────────────────────
+  {
+    id: "build-intro",
+    label: "Build · Introduce",
+    render: () => (
+      <div className="slide-inner">
+        <span className="eyebrow" style={{ color: "var(--violet)" }}>
+          <span className="pulse" /> Phase 02 · Build · Step 1 of 2
+        </span>
+        <h2 className="title-lg">
+          Take the plan, hand it back to <span className="grad">pi</span>.
+        </h2>
+        <p className="kicker">
+          Same loop, different verbs. pi reads the plan, writes the Apex
+          actions, scaffolds the agent, and ships a published version — all
+          from a single prompt.
+        </p>
+
+        <div className="grid-3">
+          <div className="card violet">
+            <div className="icon">λ</div>
+            <div className="card-eye">Step A</div>
+            <h3>Two stub Apex actions</h3>
+            <p>InvocableMethods with hard-coded return payloads — just enough to wire the agent end-to-end. No DML.</p>
+          </div>
+          <div className="card violet">
+            <div className="icon">✦</div>
+            <div className="card-eye">Step B</div>
+            <h3>One agent, one subagent</h3>
+            <p>The subagent calls both actions and replies with a styled HTML confirmation card embedded in its instructions.</p>
+          </div>
+          <div className="card violet">
+            <div className="icon">🚀</div>
+            <div className="card-eye">Step C</div>
+            <h3>Validate &amp; publish</h3>
+            <p>Compile + structure check, then publish. <b>No preview, no eval</b> — that’s the next phase.</p>
+          </div>
+        </div>
+
+        <div className="row muted" style={{ marginTop: 18, fontSize: 13 }}>
+          <span className="chip">Press <span className="kbd">→</span> for the build prompt</span>
+        </div>
+      </div>
+    ),
+  },
+
+  // ── 10 · Build · Execute ─────────────────────────────────────────────────
+  {
+    id: "build-run",
+    label: "Build · Execute",
+    render: ({ runInPi }) => (
+      <div className="slide-inner">
+        <span className="eyebrow" style={{ color: "var(--violet)" }}>
+          <span className="pulse" /> Phase 02 · Build · Step 2 of 2
+        </span>
+        <h2 className="title-lg">Hand the plan to <span className="grad">pi</span>. Watch it build.</h2>
+        <p className="kicker">
+          This prompt instructs pi to read{" "}
+          <span className="mono">planning/case-deflection-plan.html</span>,
+          scaffold two stub Apex actions, author one Agentforce agent with one
+          subagent, and <b>validate + publish</b> only — no preview yet.
+        </p>
+
+        <PromptBlock
+          prompt={BUILD_PROMPT}
+          onRun={runInPi}
+          label="Run build in pi"
+          hint="opens the Live demo tab and runs the build prompt"
+        />
       </div>
     ),
   },
