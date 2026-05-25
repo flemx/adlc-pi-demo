@@ -52,16 +52,15 @@ Steps:
 
 **Read-only** — no DML, no deploy.`;
 
-export const BUILD_PROMPT = `You are sf-pi. Build the Agentforce agent described in planning/case-deflection-plan.html. Keep the scope tiny — this is a live demo, target under 60 seconds end to end.
+export const BUILD_PROMPT = `You are sf-pi. Build the Agentforce agent described in planning/case-deflection-plan.html. Keep it tiny.
 
 Steps:
 1. Read planning/case-deflection-plan.html for the agent design.
-2. Write exactly TWO stub Apex @InvocableMethod actions under force-app/main/default/classes/, with their cls-meta.xml. Hard-coded returns, no DML, no SOQL. Use Request/Response inner classes.
-3. Deploy both classes in ONE call: sf project deploy start -o my-agentforce-org -d <cls> -d <meta> -d <cls> -d <meta>.
-4. Use agentscript_authoring verb=create to scaffold the bundle, then write the .agent file with EXACTLY ONE subagent that calls BOTH actions. That single subagent IS the start_agent — do NOT add a main / router agent on top. Use agent_type AgentforceEmployeeAgent. Every action needs an inputs: AND outputs: block; for any Apex Decimal/number output use complex_data_type_name lightning__numberType (NOT lightning__doubleType — it 500s).
-5. The subagent's reasoning instructions must end with a self-contained HTML reply card (inline CSS, dark theme, Salesforce-blue accent, no markdown, no code fences).
-6. Validate: agentscript_authoring compile/check, then inspect/check_targets target_org=my-agentforce-org. Then publish + activate in one call: agentscript_lifecycle action=publish activate=true target_org=my-agentforce-org.
-   DO NOT run agentscript_preview, DO NOT run agentscript_eval — that's the next phase.
+2. Write TWO stub Apex @InvocableMethod actions.
+3. Deploy both Apex classes in a single sf project deploy call.
+4. Use /agentscript_authoring skill to create the agent bundle: EXACTLY ONE subagent that calls BOTH actions. That single subagent IS the start_agent .
+5. The subagent's reasoning instructions end with a self-contained HTML reply card (inline CSS, dark theme, Salesforce-blue accent).
+6. Validate, then publish + activate. Do NOT run preview or eval — that's the next phase.
 
 When done, print ONE line: agent api name · version · activation status · path to each Apex class.`;
 
@@ -69,16 +68,15 @@ When done, print ONE line: agent api name · version · activation status · pat
  * BUILD_PROMPT, with `**word**` markers around the audience-visible highlights.
  * Stripped before the prompt is sent to pi or copied. Keep in lock-step.
  */
-const BUILD_PROMPT_DISPLAY = `You are **sf-pi**. Build the Agentforce agent described in **planning/case-deflection-plan.html**. Keep the scope tiny — this is a live demo, target **under 60 seconds** end to end.
+const BUILD_PROMPT_DISPLAY = `You are **sf-pi**. Build the Agentforce agent described in **planning/case-deflection-plan.html**. Keep it tiny.
 
 Steps:
 1. Read **planning/case-deflection-plan.html** for the agent design.
-2. Write **exactly TWO stub Apex @InvocableMethod actions** under **force-app/main/default/classes/**, with their **cls-meta.xml**. **Hard-coded returns, no DML, no SOQL**. Use **Request/Response inner classes**.
-3. **Deploy both classes in ONE call**: **sf project deploy start -o my-agentforce-org** -d <cls> -d <meta> -d <cls> -d <meta>.
-4. Use **agentscript_authoring verb=create** to scaffold the bundle, then write the .agent file with **EXACTLY ONE subagent** that calls **BOTH actions**. **That single subagent IS the start_agent** — do **NOT add a main / router agent** on top. Use **agent_type AgentforceEmployeeAgent**. Every action needs an **inputs:** AND **outputs:** block; for any Apex Decimal/number output use **complex_data_type_name lightning__numberType** (**NOT lightning__doubleType** — it 500s).
-5. The subagent's reasoning instructions must end with a **self-contained HTML reply card** (inline CSS, dark theme, Salesforce-blue accent, **no markdown, no code fences**).
-6. **Validate**: **agentscript_authoring compile/check**, then **inspect/check_targets** target_org=my-agentforce-org. Then **publish + activate in one call**: **agentscript_lifecycle action=publish activate=true** target_org=my-agentforce-org.
-   **DO NOT run agentscript_preview, DO NOT run agentscript_eval** — that's the next phase.
+2. Write TWO stub Apex @InvocableMethod actions.
+3. **Deploy both Apex classes** in a single **sf project deploy** call.
+4. Use **/agentscript_authoring** skill to create the agent bundle: EXACTLY ONE subagent that calls BOTH actions. That single subagent IS the start_agent.
+5. The subagent's reasoning instructions end with a **self-contained HTML reply card** (inline CSS, dark theme, Salesforce-blue accent).
+6. **Validate**, then **publish + activate**. Do NOT run **preview or eval** — that's the next phase.
 
 When done, print **ONE line**: agent api name · version · activation status · path to each Apex class.`;
 
@@ -423,123 +421,24 @@ export const slides: Slide[] = [
     ),
   },
 
-  // ── 8 · Plan · Review ────────────────────────────────────────────────────
-  {
-    id: "plan-review",
-    label: "Plan · Review",
-    render: ({ goToPlanning }) => (
-      <div className="slide-inner">
-        <span className="eyebrow" style={{ color: "var(--teal)" }}>
-          <span className="pulse" /> Phase 01 · Plan · Step 3 of 3
-        </span>
-        <h2 className="title-lg">Read the plan it wrote.</h2>
-        <p className="kicker">
-          When pi finishes, the new HTML report pops up in the Planning tab.
-          The file explorer is watching <span className="mono">planning/</span>
-          {" "}live — new files auto-select, HTML renders inline, Markdown
-          previews on the right.
-        </p>
-
-        <div className="grid-2">
-          <div className="card teal">
-            <div className="icon">📁</div>
-            <div className="card-eye">Planning workspace</div>
-            <h3>Project · planning/</h3>
-            <p>
-              File explorer + viewer. HTML renders in a sandboxed frame,
-              Markdown renders with a styled preview, and any file in{" "}
-              <span className="mono">planning/</span> created in the next 60
-              seconds will pop up automatically.
-            </p>
-            <div className="row" style={{ marginTop: 14 }}>
-              <button className="btn primary" onClick={goToPlanning}>
-                📁 Open the planning workspace
-              </button>
-              <span className="chip">opens the <b>Planning</b> tab</span>
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-eye">What you should see</div>
-            <ul className="bullets">
-              <li>A polished, dark-themed HTML report</li>
-              <li>The 5 cases as cards with the recurring theme highlighted</li>
-              <li>A proposed agent design + an "actions to build" checklist — the input for the build phase</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    ),
-  },
-
-  // ── 9 · Build · Introduce ────────────────────────────────────────────────
-  {
-    id: "build-intro",
-    label: "Build · Introduce",
-    render: () => (
-      <div className="slide-inner">
-        <span className="eyebrow" style={{ color: "var(--violet)" }}>
-          <span className="pulse" /> Phase 02 · Build · Step 1 of 2
-        </span>
-        <h2 className="title-lg">
-          Take the plan, hand it back to <span className="grad">pi</span>.
-        </h2>
-        <p className="kicker">
-          Same loop, different verbs. pi reads the plan, writes the Apex
-          actions, scaffolds the agent, and ships a published version — all
-          from a single prompt.
-        </p>
-
-        <div className="grid-3">
-          <div className="card violet">
-            <div className="icon">λ</div>
-            <div className="card-eye">Step A</div>
-            <h3>Two stub Apex actions</h3>
-            <p>InvocableMethods with hard-coded return payloads — just enough to wire the agent end-to-end. No DML.</p>
-          </div>
-          <div className="card violet">
-            <div className="icon">✦</div>
-            <div className="card-eye">Step B</div>
-            <h3>One agent, one subagent</h3>
-            <p>The subagent calls both actions and replies with a styled HTML confirmation card embedded in its instructions.</p>
-          </div>
-          <div className="card violet">
-            <div className="icon">🚀</div>
-            <div className="card-eye">Step C</div>
-            <h3>Validate &amp; publish</h3>
-            <p>Compile + structure check, then publish. <b>No preview, no eval</b> — that’s the next phase.</p>
-          </div>
-        </div>
-
-        <div className="row muted" style={{ marginTop: 18, fontSize: 13 }}>
-          <span className="chip">Press <span className="kbd">→</span> for the build prompt</span>
-        </div>
-      </div>
-    ),
-  },
-
-  // ── 10 · Build · Execute ─────────────────────────────────────────────────
+  // ── 7 · Build · Execute ─────────────────────────────────────────────────
   {
     id: "build-run",
     label: "Build · Execute",
     render: ({ runInPi }) => (
       <div className="slide-inner">
         <span className="eyebrow" style={{ color: "var(--violet)" }}>
-          <span className="pulse" /> Phase 02 · Build · Step 2 of 2
+          <span className="pulse" /> Phase 02 · Build
         </span>
-        <h2 className="title-lg">Hand the plan to <span className="grad">pi</span>. Watch it build.</h2>
-        <p className="kicker">
-          This prompt instructs pi to read{" "}
-          <span className="mono">planning/case-deflection-plan.html</span>,
-          scaffold two stub Apex actions, author one Agentforce agent with one
-          subagent, and <b>validate + publish</b> only — no preview yet.
-        </p>
+        <h2 className="title-lg">
+          Now ask <span className="grad">pi</span> to build it.
+        </h2>
 
         <PromptBlock
           prompt={BUILD_PROMPT}
           display={BUILD_PROMPT_DISPLAY}
           onRun={runInPi}
           label="Run build in pi"
-          hint="opens the Live demo tab and runs the build prompt"
         />
       </div>
     ),

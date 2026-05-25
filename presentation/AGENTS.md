@@ -20,7 +20,7 @@ The presenter never has to leave the app. Four tabs cover the full journey:
 
 | # | Tab | What it is |
 |---|-----|------------|
-| 1 | **📊 Slides** | 9-slide deck. Two of the slides have **⚡ Run in pi** buttons that drive the terminal tab. The Plan·Analyse slide also has an inline `↗ Open Cases` link that opens the Salesforce Cases list in a new tab (no in-app embedding — Salesforce CSP blocks framing). Speaker-first design: minimal text on slides, the speaker tells the story. |
+| 1 | **📊 Slides** | 7-slide deck. Two of the slides have **⚡ Run in pi** buttons that drive the terminal tab. The Plan·Analyse slide also has an inline `↗ Open Cases` link that opens the Salesforce Cases list in a new tab (no in-app embedding — Salesforce CSP blocks framing). Speaker-first design: minimal text on slides, the speaker tells the story. The pre-Plan and pre-Build narrator slides (`plan-review`, `build-intro`) were dropped — their content is delivered live by the speaker. |
 | 2 | **📁 Planning** | File explorer + HTML/Markdown viewer, scoped to `planning/` by default so the audience sees only the demo's output. Segmented toggle in the header (`📁 Planning` / `📦 Whole project`) flips to the full SFDX root for poking at `force-app/`, etc. **Manual refresh** — click ↺ Refresh after `pi` writes new files. |
 | 3 | **⚡ Live demo** | `ghostty-web` terminal in an iframe, talking WebSocket→PTY to a `node-pty` shell rooted at the SFDX project. Toolbar has a **▶ Start pi agent** button to launch an interactive `pi` session manually; slide ⚡ Run buttons type `pi '<prompt>'` directly at the shell with the prompt pre-filled as argv. |
 
@@ -43,9 +43,7 @@ Each slide id corresponds to a slide in `presentation/components/slides.tsx`.
 | 4 | `sf-pi` | — | Why we use `sf-pi` for the demo |
 | 5 | `loop` | — | Plan · Build · Test loop |
 | 6 | `plan-analyse` | **Plan** | Highlighted prompt + ⚡ Run → drives `pi` to write `planning/case-deflection-plan.html`. Inline `↗ Open Cases` button opens the org's Cases list in a new tab so the speaker can show real backlog. |
-| 7 | `plan-review` | **Plan** | "Open the planning workspace" — button switches to Planning tab; new HTML auto-opens |
-| 8 | `build-intro` | **Build** | Narrative: 2 stub Apex actions, 1 agent, 1 subagent, validate + publish |
-| 9 | `build-run` | **Build** | Prompt + ⚡ Run → drives `pi` to actually build it (no preview, no eval) |
+| 7 | `build-run` | **Build** | Highlighted prompt + ⚡ Run → drives `pi` to scaffold the Apex actions and the single-subagent agent, validate, and publish (no preview, no eval). |
 
 There is **no Test phase slide yet** — see §8.
 
@@ -161,7 +159,7 @@ agentforce/                                   ← SFDX project root, also Next c
     │       └── files/content/route.ts        ← GET /api/files/content  (sandboxed read)
     └── components/
         ├── SlideDeck.tsx                     ← deck container, dot-nav, keyboard nav
-        ├── slides.tsx                        ← 9 slides + PLAN_PROMPT (+ PLAN_PROMPT_DISPLAY w/ `**...**` highlights) / BUILD_PROMPT + <PromptBlock>
+        ├── slides.tsx                        ← 7 slides + PLAN_PROMPT (+ PLAN_PROMPT_DISPLAY w/ `**...**` highlights) / BUILD_PROMPT (+ BUILD_PROMPT_DISPLAY) + <PromptBlock>
         ├── Planning.tsx                      ← tree explorer + HTML/MD viewer + manual refresh + scope toggle (planning-only ↔ whole project)
         └── TerminalFrame.tsx                 ← forwardRef + useImperativeHandle (runCommand/interrupt/reset)
 ```
@@ -333,13 +331,27 @@ Editing them is the lever for changing what the demo agent does.
 
 ### Build prompt — invariants
 
-- **Exactly 2 stub Apex `@InvocableMethod` actions.** No DML, no SOQL writes.
-- **Exactly 1 agent, exactly 1 subagent**, the subagent calls **both** actions.
+- **Audience-readable, not a recipe.** BUILD_PROMPT is shown live on stage
+  alongside the planning prompt. It states the demo's hard rules (what to
+  build, what NOT to do) but deliberately omits the dialect details — those
+  live in the SFDX-root **`AGENTS.md`** (`agentforce/AGENTS.md`) which pi
+  auto-loads when it boots in the project. If you find yourself wanting to
+  add a `lightning__numberType` warning or a `Request/Response inner classes`
+  hint to the prompt, push it into `agentforce/AGENTS.md` instead.
+- **No `AGENTS.md` references in the prompt.** pi reads it without being
+  told. Don't write "Read AGENTS.md first" — it's noise on the slide.
+- **Two stub Apex `@InvocableMethod` actions.** No DML, no SOQL writes.
+- **Single-subagent topology, no router.** Exactly ONE subagent that calls
+  BOTH actions, and that subagent IS the `start_agent`. The prompt says so
+  explicitly; `agentforce/AGENTS.md` §4 + §8 enforce it for pi.
 - **Validate + publish ONLY.** Explicitly forbids `agentscript_preview` and
   `agentscript_eval` — those belong to the next phase.
-- **Confirmation card is HTML inside the agent's reply instructions.** Inline
-  CSS, dark theme, salesforce-blue. The agent renders this in the chat UI when
-  the actions complete.
+- **Confirmation card is HTML inside the subagent's reply instructions.**
+  Inline CSS, dark theme, salesforce-blue. The agent renders this in the
+  chat UI when the actions complete.
+- **Two strings, kept in lock-step:** `BUILD_PROMPT` (raw) and
+  `BUILD_PROMPT_DISPLAY` (with `**word**` highlight markers) — same rule as
+  the Plan pair. Verify with the strip-`**...**`-then-compare check.
 
 If you change the constraints (e.g. allow more actions), update the
 corresponding **Build · Intro** slide cards too — they currently read "Two stub
@@ -383,8 +395,12 @@ You are sf-pi. The agent we built is published. Test it.
    it / don't ship it" verdict. Same dark salesforce-blue aesthetic as the plan report.
 ```
 
-When you build this, add a `goToPlanning` call from `test-run` (same UX as
-`plan-review`) so the audience sees the results file pop in.
+When you build this, the speaker-first pattern still applies: one
+`test-run` slide with the prompt + a ⚡ Run button. If you want the audience
+to watch the results file appear, the `runInPi` callback can chain a
+`goToPlanning()` after a delay — the prompt-block component already exposes
+the context. (`SlideContext.goToPlanning` is still wired through even
+though no current slide uses it, so adding this is a one-liner.)
 
 ---
 
@@ -492,4 +508,4 @@ turn isn't fighting a cold start during the actual presentation.
 
 ---
 
-*Last update: 3-tab rig (Slides / Planning / Live demo). 9 slides — `plan-look` removed, `↗ Open Cases` button moved inline onto the Plan·Analyse slide. PLAN_PROMPT shortened for live audience and rendered with `**word**` highlights via PLAN_PROMPT_DISPLAY; step 3 spells out the agent design (topic / actions / inputs / returns / reply / success metric) so BUILD_PROMPT has a clean blueprint. Report kept SHORT for fast generation and includes a simple HTML/CSS flexbox diagram of the agent (no SVG — fewer tokens, no coordinate math). Planning tab now defaults to a scoped view of `planning/` only, with a segmented toggle to flip into the whole SFDX project. Salesforce opens in a new tab. `pi '<prompt>'` argv injection — no bracketed paste, no auto-launch state. Plan + Build phases shipped. Test phase pending — see §8.*
+*Last update: 3-tab rig (Slides / Planning / Live demo). 7 slides — `plan-look`, `plan-review`, `build-intro` all dropped (their narration is now delivered live by the speaker; only the actionable prompt slides remain in each phase). Each phase is one slide: Plan·Analyse (with inline `↗ Open Cases`) and Build·Execute (just the prompt). PLAN_PROMPT and BUILD_PROMPT both kept short, audience-readable, and rendered with `**word**` highlights via paired *_DISPLAY constants. Implementation guardrails (deploy flags, agent_type, lightning__numberType, Request/Response inner classes, exact lifecycle tool args) live exclusively in `agentforce/AGENTS.md` where pi auto-loads them. Single-subagent / no-router topology enforced in BUILD_PROMPT and across the SFDX-root AGENTS.md (§1, §2.5, §4, §8). Planning tab defaults to a scoped view of `planning/` only, with a segmented toggle to flip into the whole SFDX project. Salesforce opens in a new tab. `pi '<prompt>'` argv injection — no bracketed paste, no auto-launch state. Plan + Build phases shipped. Test phase pending — see §8.*
