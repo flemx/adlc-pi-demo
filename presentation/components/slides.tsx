@@ -18,19 +18,31 @@ export type Slide = {
 
 // ── prompts ────────────────────────────────────────────────────────────────
 
-export const PLAN_PROMPT = `You are sf-pi running inside a Salesforce DX project. Goal: surface case-deflection opportunities for our support team.
+export const PLAN_PROMPT = `Read the 5 most recent Cases from the default org and propose ONE Agentforce service agent that would deflect the most of them.
 
 Steps:
-1. Use the sf CLI (sf data query --json) on the default org to pull the 5 most recently created Cases. Include Subject, Description, Status, Priority, Type, Reason, CreatedDate, Account.Name, and the most recent CaseComment if available.
-2. Analyse the cases for COMMON THEMES — repeating topics, things a self-service experience could resolve, and the cases that are best candidates for a service-agent deflection.
-3. Propose ONE Agentforce service agent that would deflect the largest share of these cases. Describe its topic, the 1–2 actions it should call, the data inputs, and the success metric.
-4. Save the full analysis as a polished, presentation-ready HTML report at planning/case-deflection-plan.html.
-   - Single self-contained file with inline CSS (no external network requests).
-   - Dark, modern aesthetic — Salesforce blue (#00a1e0) on near-black, subtle gradient accents, clean typography.
-   - Sections: executive summary, the 5 cases as cards, theme analysis, proposed agent design, and an "Actions to build" checklist.
-5. Print a one-line summary of where the report was saved.
+1. Pull the 5 newest Cases via sf data query (Subject, Description, Status, Priority, Account.Name).
+2. Find the common themes across them.
+3. Propose ONE service agent: topic, 1–2 actions, success metric.
+4. Save a SHORT HTML report at planning/case-deflection-plan.html — keep it concise so it generates quickly. Dark theme, Salesforce blue, inline CSS. Include a simple HTML/CSS diagram of the agent: a topic box on top with the 1–2 action boxes below it, connected with a thin line. Use flexbox + border-radius, no SVG.
 
-Read-only org calls only. Do not deploy or run any DML.`;
+Read-only — no DML, no deploy.`;
+
+/**
+ * PLAN_PROMPT, but with `**word**` markers around the bits we want to highlight
+ * when shown to a live audience. The markers are stripped before the prompt is
+ * sent to pi or copied. Keep this in lock-step with PLAN_PROMPT — same words,
+ * just wrapped.
+ */
+const PLAN_PROMPT_DISPLAY = `Read the **5 most recent Cases** from the default org and propose **ONE Agentforce service agent** that would deflect the most of them.
+
+Steps:
+1. Pull the 5 newest Cases via **sf data query** (Subject, Description, Status, Priority, Account.Name).
+2. Find the **common themes** across them.
+3. Propose **ONE service agent**: topic, 1–2 actions, success metric.
+4. Save a **short HTML report** at **planning/case-deflection-plan.html** — keep it **concise** so it generates quickly. Dark theme, Salesforce blue, inline CSS. Include a **simple HTML/CSS diagram** of the agent: a topic box on top with the 1–2 action boxes below it, connected with a thin line. Use **flexbox + border-radius, no SVG**.
+
+**Read-only** — no DML, no deploy.`;
 
 export const BUILD_PROMPT = `You are sf-pi. Read planning/case-deflection-plan.html and build the proposed Agentforce service agent in this SFDX project. Keep the scope tiny — this is a live demo.
 
@@ -46,12 +58,36 @@ When done, print a one-line summary: agent api name, version number, activation 
 
 // ── prompt block UI ────────────────────────────────────────────────────────
 
+/**
+ * Renders a string with `**word**` segments turned into highlighted spans.
+ * Lightweight on purpose — not full markdown.
+ */
+function renderHighlighted(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((p, i) => {
+    const m = p.match(/^\*\*([^*]+)\*\*$/);
+    return m ? <mark key={i} className="hl">{m[1]}</mark> : <React.Fragment key={i}>{p}</React.Fragment>;
+  });
+}
+
 function PromptBlock({
   prompt,
+  display,
   onRun,
   label = "Run in pi",
   hint,
-}: { prompt: string; onRun: (p: string) => void; label?: string; hint?: string }) {
+  extra,
+}: {
+  /** Raw prompt text — sent to pi and copied to clipboard. */
+  prompt: string;
+  /** Optional formatted version (with `**...**` highlights) shown to the audience. */
+  display?: string;
+  onRun: (p: string) => void;
+  label?: string;
+  hint?: string;
+  /** Optional extra content rendered next to the action buttons (e.g. an external link). */
+  extra?: React.ReactNode;
+}) {
   const [copied, setCopied] = React.useState(false);
 
   const onCopy = async () => {
@@ -68,6 +104,7 @@ function PromptBlock({
         <span className="chip"><b>prompt for pi</b></span>
         {hint && <span className="muted" style={{ fontSize: 12 }}>{hint}</span>}
         <div className="prompt-actions">
+          {extra}
           <button className="btn" onClick={onCopy}>
             {copied ? "✓ Copied" : "⧉ Copy prompt"}
           </button>
@@ -76,7 +113,7 @@ function PromptBlock({
           </button>
         </div>
       </div>
-      <pre className="prompt-body mono">{prompt}</pre>
+      <pre className="prompt-body mono">{display ? renderHighlighted(display) : prompt}</pre>
       <div className="prompt-foot mono">
         <span className="muted">$</span>{" "}
         <span className="prompt-cmd">pi</span>{" "}
@@ -308,8 +345,8 @@ export const slides: Slide[] = [
         <div className="grid-3" style={{ marginTop: 8 }}>
           <div className="card teal">
             <div className="card-eye">Up next</div>
-            <h3>Plan · look at the org</h3>
-            <p>We’ll open the live org and look at the case backlog before asking pi to analyse it.</p>
+            <h3>Plan · ask pi to analyse</h3>
+            <p>One prompt, one verb. pi reads the case backlog and writes a deflection plan.</p>
           </div>
           <div className="card" style={{ opacity: 0.55 }}>
             <div className="card-eye">Then</div>
@@ -326,83 +363,35 @@ export const slides: Slide[] = [
     ),
   },
 
-  // ── 6 · Plan · Look at the org ───────────────────────────────────────────
-  {
-    id: "plan-look",
-    label: "Plan · Look at the org",
-    render: () => (
-      <div className="slide-inner">
-        <span className="eyebrow" style={{ color: "var(--teal)" }}>
-          <span className="pulse" /> Phase 01 · Plan · Step 1 of 3
-        </span>
-        <h2 className="title-lg">
-          First, let’s see what the team is dealing with.
-        </h2>
-        <p className="kicker">
-          Open the production org in a new tab and skim the open case list.
-          Real cases, real backlog — the raw input pi will plan against.
-        </p>
-
-        <div className="grid-2">
-          <div className="card teal">
-            <div className="icon">🏢</div>
-            <div className="card-eye">Live org</div>
-            <h3>Open Cases</h3>
-            <p>
-              <span className="mono">orgfarm-22ccc7c65d.lightning.force.com</span>
-              {" "}— the <span className="mono">AllOpenCases</span> list view.
-              Skim it, get a feel for the volume and the topics, then come
-              back to this tab.
-            </p>
-            <div className="row" style={{ marginTop: 14 }}>
-              <a
-                className="btn primary"
-                href={ORG_CASES_URL}
-                target="_blank"
-                rel="noreferrer"
-              >
-                ↗ Open Cases in new tab
-              </a>
-              <span className="chip mono" style={{ fontSize: 11 }}>
-                lightning.force.com
-              </span>
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-eye">What to notice</div>
-            <ul className="bullets">
-              <li><b>Recurring topics</b> — the same questions, asked five different ways</li>
-              <li><b>Self-service candidates</b> — anything a customer could resolve with one bot turn</li>
-              <li><b>Routing pain</b> — cases that bounce between queues before landing</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    ),
-  },
-
-  // ── 7 · Plan · Analyse with pi ───────────────────────────────────────────
+  // ── 6 · Plan · Analyse with pi ──────────────────────────────────────────
   {
     id: "plan-analyse",
     label: "Plan · Analyse",
     render: ({ runInPi }) => (
       <div className="slide-inner">
         <span className="eyebrow" style={{ color: "var(--teal)" }}>
-          <span className="pulse" /> Phase 01 · Plan · Step 2 of 3
+          <span className="pulse" /> Phase 01 · Plan
         </span>
-        <h2 className="title-lg">Now ask <span className="grad">pi</span> to analyse.</h2>
-        <p className="kicker">
-          One prompt, one verb. <span className="mono">pi</span> queries the
-          last 5 cases through the <span className="mono">sf</span> CLI, finds
-          the common themes, and writes a styled HTML deflection report into{" "}
-          <span className="mono">planning/</span>.
-        </p>
+        <h2 className="title-lg">
+          Ask <span className="grad">pi</span> to plan the agent.
+        </h2>
 
         <PromptBlock
           prompt={PLAN_PROMPT}
+          display={PLAN_PROMPT_DISPLAY}
           onRun={runInPi}
           label="Run plan in pi"
-          hint="opens the Live demo tab and types pi '…' for you"
+          extra={
+            <a
+              className="btn"
+              href={ORG_CASES_URL}
+              target="_blank"
+              rel="noreferrer"
+              title="Open the live org's Cases list in a new tab"
+            >
+              ↗ Open Cases
+            </a>
+          }
         />
       </div>
     ),

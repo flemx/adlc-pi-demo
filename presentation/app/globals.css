@@ -408,17 +408,25 @@ button { font-family: inherit; }
 .prompt-actions { margin-left: auto; display: flex; gap: 8px; }
 .prompt-body {
   font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.7;
   color: var(--fg-1);
   background: rgba(2,3,10,0.7);
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 14px 16px;
+  padding: 16px 18px;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 340px;
+  max-height: 380px;
   overflow: auto;
+}
+.prompt-body .hl {
+  background: linear-gradient(180deg, rgba(0,161,224,0.32), rgba(0,161,224,0.18));
+  color: #eaf6ff;
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(0,161,224,0.45);
 }
 .prompt-foot {
   font-size: 12px;
@@ -642,7 +650,54 @@ button { font-family: inherit; }
   font-size: 10px; letter-spacing: 0.18em; color: var(--accent-hi);
   font-weight: 700; text-transform: uppercase;
 }
-.plan-section-name { font-size: 13px; color: var(--fg-1); }
+.plan-section-name {
+  font-size: 13px; color: var(--fg-1);
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 8px;
+  margin-left: -8px;
+  border-radius: 6px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.plan-section-name:hover {
+  background: rgba(0,161,224,0.10);
+  color: var(--accent-hi);
+}
+.plan-section-name::after {
+  content: "↗";
+  font-size: 10px;
+  color: var(--fg-3);
+  opacity: 0.6;
+}
+.plan-section-name:hover::after { opacity: 1; color: var(--accent-hi); }
+
+/* segmented scope toggle in the planning header */
+.scope-toggle {
+  display: inline-flex;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.scope-btn {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-2);
+  background: transparent;
+  border: 0;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.scope-btn:hover { color: var(--fg-0); }
+.scope-btn.active {
+  background: rgba(0,161,224,0.18);
+  color: var(--accent-hi);
+  box-shadow: inset 0 0 0 1px rgba(0,161,224,0.35);
+}
 .plan-tree-list {
   flex: 1 1 auto; overflow: auto; padding: 6px 0;
 }

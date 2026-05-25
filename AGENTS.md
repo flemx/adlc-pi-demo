@@ -20,8 +20,8 @@ The presenter never has to leave the app. Four tabs cover the full journey:
 
 | # | Tab | What it is |
 |---|-----|------------|
-| 1 | **📊 Slides** | 10-slide deck. Two of the slides have **⚡ Run in pi** buttons that drive the terminal tab. The Plan·Look slide has a `↗ Open Cases in new tab` button that opens the Salesforce Cases list directly (no in-app embedding — Salesforce CSP blocks framing). |
-| 2 | **📁 Planning** | File explorer + HTML/Markdown viewer. **Manual refresh** — click ↺ Refresh after `pi` writes new files. |
+| 1 | **📊 Slides** | 9-slide deck. Two of the slides have **⚡ Run in pi** buttons that drive the terminal tab. The Plan·Analyse slide also has an inline `↗ Open Cases` link that opens the Salesforce Cases list in a new tab (no in-app embedding — Salesforce CSP blocks framing). Speaker-first design: minimal text on slides, the speaker tells the story. |
+| 2 | **📁 Planning** | File explorer + HTML/Markdown viewer, scoped to `planning/` by default so the audience sees only the demo's output. Segmented toggle in the header (`📁 Planning` / `📦 Whole project`) flips to the full SFDX root for poking at `force-app/`, etc. **Manual refresh** — click ↺ Refresh after `pi` writes new files. |
 | 3 | **⚡ Live demo** | `ghostty-web` terminal in an iframe, talking WebSocket→PTY to a `node-pty` shell rooted at the SFDX project. Toolbar has a **▶ Start pi agent** button to launch an interactive `pi` session manually; slide ⚡ Run buttons type `pi '<prompt>'` directly at the shell with the prompt pre-filled as argv. |
 
 The repo has only **one** SFDX project at the root. `presentation/` is a peer
@@ -42,11 +42,10 @@ Each slide id corresponds to a slide in `presentation/components/slides.tsx`.
 | 3 | `agents` | — | Claude Code, Codex, Agentforce Vibes — interchangeable |
 | 4 | `sf-pi` | — | Why we use `sf-pi` for the demo |
 | 5 | `loop` | — | Plan · Build · Test loop |
-| 6 | `plan-look` | **Plan** | "Look at the org" — button opens the Salesforce Cases list in a new tab |
-| 7 | `plan-analyse` | **Plan** | Prompt + ⚡ Run → drives `pi` to write `planning/case-deflection-plan.html` |
-| 8 | `plan-review` | **Plan** | "Open the planning workspace" — button switches to Planning tab; new HTML auto-opens |
-| 9 | `build-intro` | **Build** | Narrative: 2 stub Apex actions, 1 agent, 1 subagent, validate + publish |
-| 10 | `build-run` | **Build** | Prompt + ⚡ Run → drives `pi` to actually build it (no preview, no eval) |
+| 6 | `plan-analyse` | **Plan** | Highlighted prompt + ⚡ Run → drives `pi` to write `planning/case-deflection-plan.html`. Inline `↗ Open Cases` button opens the org's Cases list in a new tab so the speaker can show real backlog. |
+| 7 | `plan-review` | **Plan** | "Open the planning workspace" — button switches to Planning tab; new HTML auto-opens |
+| 8 | `build-intro` | **Build** | Narrative: 2 stub Apex actions, 1 agent, 1 subagent, validate + publish |
+| 9 | `build-run` | **Build** | Prompt + ⚡ Run → drives `pi` to actually build it (no preview, no eval) |
 
 There is **no Test phase slide yet** — see §8.
 
@@ -162,8 +161,8 @@ agentforce/                                   ← SFDX project root, also Next c
     │       └── files/content/route.ts        ← GET /api/files/content  (sandboxed read)
     └── components/
         ├── SlideDeck.tsx                     ← deck container, dot-nav, keyboard nav
-        ├── slides.tsx                        ← 10 slides + PLAN_PROMPT / BUILD_PROMPT + <PromptBlock>
-        ├── Planning.tsx                      ← tree explorer + HTML/MD viewer + manual refresh
+        ├── slides.tsx                        ← 9 slides + PLAN_PROMPT (+ PLAN_PROMPT_DISPLAY w/ `**...**` highlights) / BUILD_PROMPT + <PromptBlock>
+        ├── Planning.tsx                      ← tree explorer + HTML/MD viewer + manual refresh + scope toggle (planning-only ↔ whole project)
         └── TerminalFrame.tsx                 ← forwardRef + useImperativeHandle (runCommand/interrupt/reset)
 ```
 
@@ -300,15 +299,32 @@ Editing them is the lever for changing what the demo agent does.
 
 ### Plan prompt — invariants
 
+- **Audience-first wording.** This prompt is shown to a live audience on
+  stage. Keep it short, plain English, and structured as a numbered list —
+  no jargon they won't recognize. Speaker tells the story.
 - **Read-only org calls only.** Uses `sf data query`. No DML, no deploy.
 - **Output path is hard-coded:** `planning/case-deflection-plan.html`. The
   Planning tab's auto-pop logic prefers `.html` then `.md`, so renaming the
   output file is fine, but keep it in `planning/`.
-- **Style requirements** (dark, salesforce-blue, inline CSS, no external
-  network) are explicit in the prompt because the file renders in a sandboxed
-  iframe with `allow-same-origin allow-popups` only — no `allow-scripts` if it
-  matters, but `srcDoc` runs scripts by default in same-origin sandbox.
-  Test-render the agent's output before each demo.
+- **Two strings, kept in lock-step:** `PLAN_PROMPT` (raw text, sent to pi)
+  and `PLAN_PROMPT_DISPLAY` (same content, with `**word**` markers around
+  the bits we want highlighted on the slide). Edit both together — the
+  display string is rendered through `renderHighlighted()` which only
+  understands `**...**`. Anything else is treated as literal text.
+- **Style requirements** (dark, salesforce-blue, inline CSS) are kept brief
+  in the prompt itself. The Planning tab renders the result in a sandboxed
+  iframe — test-render the agent's output before each demo.
+- **Keep the report short.** The prompt explicitly asks for a SHORT /
+  concise HTML so the live audience isn't watching pi generate paragraph
+  after paragraph for a minute. If you grow the report, expect generation
+  time to grow with it.
+- **HTML/CSS diagram of the agent (no SVG).** The prompt asks pi to draw
+  a tiny flexbox tree — topic box on top, 1–2 action boxes below,
+  connected with a thin line. We deliberately avoid SVG: flexbox + border-
+  radius is fewer tokens for pi to emit, less coordinate math to get wrong,
+  and renders identically in the sandboxed Planning iframe. Don't drop
+  this — the diagram is the first thing the audience sees when the
+  Planning tab pops the new HTML.
 
 ### Build prompt — invariants
 
@@ -471,4 +487,4 @@ turn isn't fighting a cold start during the actual presentation.
 
 ---
 
-*Last update: 3-tab rig (Slides / Planning / Live demo). Salesforce opens in a new tab. `pi '<prompt>'` argv injection — no bracketed paste, no auto-launch state. Plan + Build phases shipped. Test phase pending — see §8.*
+*Last update: 3-tab rig (Slides / Planning / Live demo). 9 slides — `plan-look` removed, `↗ Open Cases` button moved inline onto the Plan·Analyse slide. PLAN_PROMPT shortened for live audience and rendered with `**word**` highlights via PLAN_PROMPT_DISPLAY; report kept SHORT for fast generation and includes a simple HTML/CSS flexbox diagram of the agent (no SVG — fewer tokens, no coordinate math). Planning tab now defaults to a scoped view of `planning/` only, with a segmented toggle to flip into the whole SFDX project. Salesforce opens in a new tab. `pi '<prompt>'` argv injection — no bracketed paste, no auto-launch state. Plan + Build phases shipped. Test phase pending — see §8.*

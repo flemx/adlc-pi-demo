@@ -125,6 +125,7 @@ function formatSize(b: number): string {
 // ── main component ──────────────────────────────────────────────────────────
 
 type Props = { active: boolean };
+type Scope = "planning" | "project";
 
 export function Planning({ active }: Props) {
   const [listings, setListings] = React.useState<Map<string, Entry[]>>(() => new Map());
@@ -132,6 +133,9 @@ export function Planning({ active }: Props) {
   const [selected, setSelected] = React.useState<string | null>(null);
   const [body, setBody] = React.useState<FileBody | null>(null);
   const [bodyError, setBodyError] = React.useState<string | null>(null);
+  // Default scope is the planning folder so the audience isn't distracted by the
+  // SFDX root. Toggle to "project" to peek at force-app/, presentation/, etc.
+  const [scope, setScope] = React.useState<Scope>("planning");
 
   const reload = React.useCallback(async () => {
     try {
@@ -222,13 +226,39 @@ export function Planning({ active }: Props) {
     return () => { cancelled = true; };
   }, [selected]);
 
-  const rootEntries = listings.get("") || [];
+  // Pick the entries the tree renders based on scope. In "planning" we show the
+  // planning/ folder directly (no SFDX root, no force-app, no presentation/).
+  const rootEntries =
+    scope === "planning"
+      ? (listings.get(PLANNING_PATH) || [])
+      : (listings.get("") || []);
+  const sectionEye  = scope === "planning" ? "PLANNING"   : "PROJECT";
+  const sectionName = scope === "planning" ? "planning/"  : "agentforce/";
 
   return (
     <div className="plan-panel">
       <div className="plan-head">
         <h2>Project workspace</h2>
-        <span className="path mono">~/agentforce/</span>
+        <div className="scope-toggle" role="tablist" aria-label="File explorer scope">
+          <button
+            role="tab"
+            aria-selected={scope === "planning"}
+            className={`scope-btn ${scope === "planning" ? "active" : ""}`}
+            onClick={() => setScope("planning")}
+            title="Show only the planning/ folder"
+          >
+            📁 Planning
+          </button>
+          <button
+            role="tab"
+            aria-selected={scope === "project"}
+            className={`scope-btn ${scope === "project" ? "active" : ""}`}
+            onClick={() => setScope("project")}
+            title="Show the whole SFDX project root"
+          >
+            📦 Whole project
+          </button>
+        </div>
         <div className="actions">
           <button
             className="btn"
@@ -248,19 +278,41 @@ export function Planning({ active }: Props) {
       <div className="plan-body">
         <aside className="plan-tree">
           <div className="plan-section">
-            <span className="plan-section-eye">PROJECT</span>
-            <span className="plan-section-name mono">agentforce/</span>
+            <span className="plan-section-eye">{sectionEye}</span>
+            <span
+              className="plan-section-name mono"
+              role="button"
+              tabIndex={0}
+              onClick={() => setScope(scope === "planning" ? "project" : "planning")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setScope(scope === "planning" ? "project" : "planning");
+                }
+              }}
+              title={
+                scope === "planning"
+                  ? "Click to browse the whole SFDX project"
+                  : "Click to scope back to planning/"
+              }
+            >
+              {sectionName}
+            </span>
           </div>
           <div className="plan-tree-list">
             {rootEntries.length === 0 && (
-              <div className="muted" style={{ padding: 12, fontSize: 12 }}>loading…</div>
+              <div className="muted" style={{ padding: 12, fontSize: 12 }}>
+                {scope === "planning" && listings.has(PLANNING_PATH)
+                  ? "empty — pi hasn't written here yet"
+                  : "loading…"}
+              </div>
             )}
             {rootEntries.map((e) => (
               <TreeNode
                 key={e.path}
                 entry={e}
                 depth={0}
-                rootPath=""
+                rootPath={scope === "planning" ? PLANNING_PATH : ""}
                 initiallyExpanded={new Set([PLANNING_PATH])}
                 selectedPath={selected}
                 onSelect={select}
