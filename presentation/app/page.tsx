@@ -4,18 +4,29 @@ import * as React from "react";
 import { SlideDeck } from "@/components/SlideDeck";
 import { TerminalFrame, type TerminalHandle } from "@/components/TerminalFrame";
 import { Planning } from "@/components/Planning";
+import { AgentsPanel } from "@/components/AgentsPanel";
 
-type TabId = "slides" | "planning" | "terminal";
+type TabId = "slides" | "planning" | "agents" | "terminal";
 
-const TAB_ORDER: TabId[] = ["slides", "planning", "terminal"];
+const TAB_ORDER: TabId[] = ["slides", "planning", "agents", "terminal"];
 
 export default function Home() {
   const [tab, setTab] = React.useState<TabId>("slides");
   const terminalRef = React.useRef<TerminalHandle | null>(null);
 
+  // Pre-fill the chat input on the Agents tab when a slide test-utterance
+  // button is clicked. Cleared as soon as <AgentChat> consumes it.
+  const [pendingUtterance, setPendingUtterance] = React.useState<string | undefined>();
+
   const goToSlides   = React.useCallback(() => setTab("slides"), []);
   const goToPlanning = React.useCallback(() => setTab("planning"), []);
+  const goToAgents   = React.useCallback(() => setTab("agents"), []);
   const goToTerminal = React.useCallback(() => setTab("terminal"), []);
+
+  const sendUtteranceToChat = React.useCallback((text: string) => {
+    setPendingUtterance(text);
+    setTab("agents");
+  }, []);
 
   /**
    * Switch to the Live demo tab and run `pi "<prompt>"` at the shell prompt.
@@ -30,14 +41,15 @@ export default function Home() {
     });
   }, []);
 
-  // Keyboard tab switching: 1/2/3, t to cycle.
+  // Keyboard tab switching: 1/2/3/4, t to cycle.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
       if (e.key === "1") setTab("slides");
       else if (e.key === "2") setTab("planning");
-      else if (e.key === "3") setTab("terminal");
+      else if (e.key === "3") setTab("agents");
+      else if (e.key === "4") setTab("terminal");
       else if (e.key.toLowerCase() === "t") {
         setTab((p) => TAB_ORDER[(TAB_ORDER.indexOf(p) + 1) % TAB_ORDER.length]);
       }
@@ -59,6 +71,7 @@ export default function Home() {
         <nav className="tabs" role="tablist" aria-label="Presentation sections">
           <TabButton id="slides"   tab={tab} onClick={goToSlides}>📊 Slides</TabButton>
           <TabButton id="planning" tab={tab} onClick={goToPlanning}>📁 Planning</TabButton>
+          <TabButton id="agents"   tab={tab} onClick={goToAgents}>✦ Agents</TabButton>
           <TabButton id="terminal" tab={tab} onClick={goToTerminal}>
             ⚡ Live demo <span className="badge">PTY</span>
           </TabButton>
@@ -74,11 +87,20 @@ export default function Home() {
           <SlideDeck
             goToTerminal={goToTerminal}
             goToPlanning={goToPlanning}
+            goToAgents={goToAgents}
             runInPi={runInPi}
+            sendUtteranceToChat={sendUtteranceToChat}
           />
         </div>
         <div className={`panel ${tab === "planning" ? "active" : ""}`}>
           <Planning active={tab === "planning"} />
+        </div>
+        <div className={`panel ${tab === "agents"   ? "active" : ""}`}>
+          <AgentsPanel
+            active={tab === "agents"}
+            pendingUtterance={pendingUtterance}
+            onConsumedUtterance={() => setPendingUtterance(undefined)}
+          />
         </div>
         <div className={`panel ${tab === "terminal" ? "active" : ""}`}>
           <TerminalFrame ref={terminalRef} active={tab === "terminal"} />

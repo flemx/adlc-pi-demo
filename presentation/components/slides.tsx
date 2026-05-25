@@ -3,12 +3,45 @@ import * as React from "react";
 export type SlideContext = {
   goToTerminal: () => void;
   goToPlanning: () => void;
+  goToAgents: () => void;
   runInPi: (prompt: string) => void;
+  sendUtteranceToChat: (text: string) => void;
 };
 
 /** Salesforce org Cases list URL — opened in a new tab from the Plan slide. */
 export const ORG_CASES_URL =
   "https://orgfarm-22ccc7c65d.lightning.force.com/lightning/o/Case/list?filterName=AllOpenCases";
+
+/**
+ * Test utterances rendered on the Test slide. Each one provides a realistic
+ * caseId + customerEmail combo so the published agent's actions have
+ * everything they need without an extra clarifying turn.
+ *
+ * Edit these to match real Case IDs from the demo org before going live.
+ */
+export const TEST_UTTERANCES: { label: string; text: string; caseId: string; email: string }[] = [
+  {
+    label: "Status check",
+    caseId: "5008z00001abcde",
+    email: "alice@example.com",
+    text:
+      "Hi, I'd like a status update on case 5008z00001abcde. The customer is alice@example.com — please look it up and let her know where things stand.",
+  },
+  {
+    label: "Apologise + acknowledge",
+    caseId: "5008z00001fghij",
+    email: "bob@example.com",
+    text:
+      "Please acknowledge case 5008z00001fghij for bob@example.com. Apologise for the wait and confirm we're working on it.",
+  },
+  {
+    label: "Apply credit",
+    caseId: "5008z00001klmno",
+    email: "carol@example.com",
+    text:
+      "Apply a goodwill credit on case 5008z00001klmno for carol@example.com — small amount, with a polite confirmation reply.",
+  },
+];
 
 export type Slide = {
   id: string;
@@ -440,6 +473,74 @@ export const slides: Slide[] = [
           onRun={runInPi}
           label="Run build in pi"
         />
+      </div>
+    ),
+  },
+
+  // ── 8 · Test · Talk to it ────────────────────────────────────
+  {
+    id: "test-run",
+    label: "Test · Talk to it",
+    render: ({ goToAgents, sendUtteranceToChat }) => (
+      <div className="slide-inner">
+        <span className="eyebrow" style={{ color: "var(--pink)" }}>
+          <span className="pulse" /> Phase 03 · Test
+        </span>
+        <h2 className="title-lg">
+          Now <span className="grad">talk to it</span>.
+        </h2>
+
+        <p className="kicker" style={{ marginBottom: 18 }}>
+          The <span className="mono">Agents</span> tab queries the org for every
+          active service agent and opens a real chat session against the
+          <span className="mono">/einstein/ai-agent/v1</span> API. Try the
+          example utterances below — each one provides the
+          {" "}<span className="mono">caseId</span> and
+          {" "}<span className="mono">customerEmail</span> the agent's actions need.
+        </p>
+
+        <div className="utterances">
+          {TEST_UTTERANCES.map((u, i) => (
+            <div className="utterance" key={i}>
+              <div className="utterance-head">
+                <span className="chip pink"><b>#{i + 1} · {u.label}</b></span>
+                <span className="mono muted" style={{ fontSize: 11 }}>
+                  case {u.caseId} · {u.email}
+                </span>
+              </div>
+              <p className="utterance-text">
+                {renderHighlighted(
+                  u.text
+                    .replace(u.caseId, `**${u.caseId}**`)
+                    .replace(u.email, `**${u.email}**`),
+                )}
+              </p>
+              <div className="utterance-actions">
+                <button
+                  className="btn"
+                  onClick={() => navigator.clipboard?.writeText(u.text).catch(() => {})}
+                  title="Copy this utterance to the clipboard"
+                >
+                  ⧉ Copy
+                </button>
+                <button
+                  className="btn primary"
+                  onClick={() => sendUtteranceToChat(u.text)}
+                  title="Open the Agents tab and pre-fill this utterance"
+                >
+                  ⚡ Send to chat
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="row" style={{ marginTop: 22, justifyContent: "center" }}>
+          <button className="btn primary" onClick={goToAgents}>
+            ✨ Open the agent chat
+          </button>
+          <span className="chip">opens the <b>Agents</b> tab</span>
+        </div>
       </div>
     ),
   },
