@@ -23,7 +23,11 @@ export const PLAN_PROMPT = `Read the 5 most recent Cases from the default org an
 Steps:
 1. Pull the 5 newest Cases via sf data query (Subject, Description, Status, Priority, Account.Name).
 2. Find the common themes across them.
-3. Propose ONE service agent: topic, 1–2 actions, success metric.
+3. Design ONE service agent in enough detail that we can scaffold it next:
+   - Topic name + which Cases it handles
+   - 1–2 actions — for each: action name, inputs, what it returns
+   - The reply the agent sends back to the customer
+   - Success metric (what counts as a deflection)
 4. Save a SHORT HTML report at planning/case-deflection-plan.html — keep it concise so it generates quickly. Dark theme, Salesforce blue, inline CSS. Include a simple HTML/CSS diagram of the agent: a topic box on top with the 1–2 action boxes below it, connected with a thin line. Use flexbox + border-radius, no SVG.
 
 Read-only — no DML, no deploy.`;
@@ -39,22 +43,44 @@ const PLAN_PROMPT_DISPLAY = `Read the **5 most recent Cases** from the default o
 Steps:
 1. Pull the 5 newest Cases via **sf data query** (Subject, Description, Status, Priority, Account.Name).
 2. Find the **common themes** across them.
-3. Propose **ONE service agent**: topic, 1–2 actions, success metric.
+3. Design **ONE service agent** in enough detail that we can **scaffold it next**:
+   - **Topic name** + which Cases it handles
+   - **1–2 actions** — for each: **action name**, **inputs**, **what it returns**
+   - The **reply** the agent sends back to the customer
+   - **Success metric** (what counts as a deflection)
 4. Save a **short HTML report** at **planning/case-deflection-plan.html** — keep it **concise** so it generates quickly. Dark theme, Salesforce blue, inline CSS. Include a **simple HTML/CSS diagram** of the agent: a topic box on top with the 1–2 action boxes below it, connected with a thin line. Use **flexbox + border-radius, no SVG**.
 
 **Read-only** — no DML, no deploy.`;
 
-export const BUILD_PROMPT = `You are sf-pi. Read planning/case-deflection-plan.html and build the proposed Agentforce service agent in this SFDX project. Keep the scope tiny — this is a live demo.
+export const BUILD_PROMPT = `You are sf-pi. Build the Agentforce agent described in planning/case-deflection-plan.html. Keep the scope tiny — this is a live demo, target under 60 seconds end to end.
 
-Constraints:
-1. Read planning/case-deflection-plan.html first to understand the goal, topic and the proposed actions.
-2. Create exactly TWO stub Apex InvocableMethod actions in force-app/main/default/classes/. Each takes a small input payload (e.g. caseId, customerEmail) and returns a hard-coded confirmation object. No real DML, no SOQL writes. Add the metadata XML for both classes.
-3. Use the agentscript_authoring tools to create ONE service agent with EXACTLY ONE subagent. The subagent must call BOTH stub actions.
-4. The agent's reply instructions must format the action confirmations as a small block of styled HTML (inline CSS, dark theme, salesforce-blue accent) so the chat UI renders a nice confirmation card.
-5. Validate the agent locally (compile + structure check) and PUBLISH it.
-   DO NOT run preview, do not run eval — we will test the agent in the next phase of the demo.
+Steps:
+1. Read planning/case-deflection-plan.html for the agent design.
+2. Write exactly TWO stub Apex @InvocableMethod actions under force-app/main/default/classes/, with their cls-meta.xml. Hard-coded returns, no DML, no SOQL. Use Request/Response inner classes.
+3. Deploy both classes in ONE call: sf project deploy start -o my-agentforce-org -d <cls> -d <meta> -d <cls> -d <meta>.
+4. Use agentscript_authoring verb=create to scaffold the bundle, then write the .agent file with EXACTLY ONE subagent that calls BOTH actions. That single subagent IS the start_agent — do NOT add a main / router agent on top. Use agent_type AgentforceEmployeeAgent. Every action needs an inputs: AND outputs: block; for any Apex Decimal/number output use complex_data_type_name lightning__numberType (NOT lightning__doubleType — it 500s).
+5. The subagent's reasoning instructions must end with a self-contained HTML reply card (inline CSS, dark theme, Salesforce-blue accent, no markdown, no code fences).
+6. Validate: agentscript_authoring compile/check, then inspect/check_targets target_org=my-agentforce-org. Then publish + activate in one call: agentscript_lifecycle action=publish activate=true target_org=my-agentforce-org.
+   DO NOT run agentscript_preview, DO NOT run agentscript_eval — that's the next phase.
 
-When done, print a one-line summary: agent api name, version number, activation status, and the path to each Apex class.`;
+When done, print ONE line: agent api name · version · activation status · path to each Apex class.`;
+
+/**
+ * BUILD_PROMPT, with `**word**` markers around the audience-visible highlights.
+ * Stripped before the prompt is sent to pi or copied. Keep in lock-step.
+ */
+const BUILD_PROMPT_DISPLAY = `You are **sf-pi**. Build the Agentforce agent described in **planning/case-deflection-plan.html**. Keep the scope tiny — this is a live demo, target **under 60 seconds** end to end.
+
+Steps:
+1. Read **planning/case-deflection-plan.html** for the agent design.
+2. Write **exactly TWO stub Apex @InvocableMethod actions** under **force-app/main/default/classes/**, with their **cls-meta.xml**. **Hard-coded returns, no DML, no SOQL**. Use **Request/Response inner classes**.
+3. **Deploy both classes in ONE call**: **sf project deploy start -o my-agentforce-org** -d <cls> -d <meta> -d <cls> -d <meta>.
+4. Use **agentscript_authoring verb=create** to scaffold the bundle, then write the .agent file with **EXACTLY ONE subagent** that calls **BOTH actions**. **That single subagent IS the start_agent** — do **NOT add a main / router agent** on top. Use **agent_type AgentforceEmployeeAgent**. Every action needs an **inputs:** AND **outputs:** block; for any Apex Decimal/number output use **complex_data_type_name lightning__numberType** (**NOT lightning__doubleType** — it 500s).
+5. The subagent's reasoning instructions must end with a **self-contained HTML reply card** (inline CSS, dark theme, Salesforce-blue accent, **no markdown, no code fences**).
+6. **Validate**: **agentscript_authoring compile/check**, then **inspect/check_targets** target_org=my-agentforce-org. Then **publish + activate in one call**: **agentscript_lifecycle action=publish activate=true** target_org=my-agentforce-org.
+   **DO NOT run agentscript_preview, DO NOT run agentscript_eval** — that's the next phase.
+
+When done, print **ONE line**: agent api name · version · activation status · path to each Apex class.`;
 
 // ── prompt block UI ────────────────────────────────────────────────────────
 
@@ -510,6 +536,7 @@ export const slides: Slide[] = [
 
         <PromptBlock
           prompt={BUILD_PROMPT}
+          display={BUILD_PROMPT_DISPLAY}
           onRun={runInPi}
           label="Run build in pi"
           hint="opens the Live demo tab and runs the build prompt"

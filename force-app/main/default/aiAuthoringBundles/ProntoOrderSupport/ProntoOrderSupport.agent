@@ -1,0 +1,175 @@
+config:
+    developer_name: "ProntoOrderSupport"
+    agent_label: "Pronto Order Support"
+    agent_type: "AgentforceEmployeeAgent"
+    description: "Pronto Order Support — handles delivery-related order status and refund inquiries for Pronto cases."
+
+system:
+    instructions: "You are the Pronto Order Support agent. You help support reps resolve delivery-related cases for Pronto orders (missing items, late delivery, wrong drop-off, refund explanations)."
+    messages:
+        welcome: "Hi, I'm the Pronto Order Support agent. Share a Case Id (and optional order number) and I'll resolve the order issue."
+        error: "Sorry, something went wrong while resolving that order."
+
+language:
+    default_locale: "en_US"
+    additional_locales: ""
+    all_additional_locales: False
+
+start_agent main:
+    description: "Entry point for ProntoOrderSupport. Routes Pronto delivery inquiries to the OrderResolution subagent."
+    reasoning:
+        actions:
+            go_to_order_resolution: @utils.transition to @subagent.order_resolution
+
+subagent order_resolution:
+    label: "Order Resolution"
+    description: |
+        Resolves Pronto delivery cases end to end. Looks up the order, then
+        applies a refund or goodwill credit per policy. Always renders the
+        final confirmation as a styled HTML card.
+
+    reasoning:
+        instructions: ->
+            | For every Pronto delivery inquiry follow this exact sequence:
+              1. Call {!@actions.get_order_status} with the caseId (and orderNumber
+                 if the user provided one) to look up order, courier and SLA state.
+              2. Call {!@actions.apply_refund_or_credit} with the caseId, the
+                 customer email, and the most appropriate reason code:
+                 - missing_items   → some line items were not delivered
+                 - sla_delay       → delivered late, past SLA
+                 - wrong_address   → delivered to the wrong location
+                 - goodwill        → none of the above, soft credit
+              3. Reply to the user with EXACTLY the following self-contained HTML
+                 confirmation card. Inline CSS only, dark theme, Salesforce blue
+                 accent. Substitute the bracketed placeholders with values from
+                 the actions. Output nothing else — no markdown, no prose
+                 around the HTML.
+
+              <div style="font-family:-apple-system,Segoe UI,Inter,sans-serif;background:#0b1220;color:#e6eefb;border:1px solid #1f2d4d;border-left:4px solid #00a1e0;border-radius:10px;padding:14px 16px;max-width:520px;">
+                <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#38bdf8;font-weight:600;margin-bottom:4px;">Pronto Order Support</div>
+                <div style="font-size:15px;font-weight:600;margin-bottom:8px;">Order [ORDER_NUMBER] — [STATUS]</div>
+                <div style="color:#8aa0c2;font-size:12.5px;line-height:1.5;margin-bottom:10px;">[CUSTOMER_MESSAGE]</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;">
+                  <span style="background:rgba(0,161,224,.12);border:1px solid #00a1e0;color:#38bdf8;padding:2px 8px;border-radius:999px;">Merchant: [MERCHANT]</span>
+                  <span style="background:rgba(167,139,250,.10);border:1px solid #a78bfa;color:#d6c8ff;padding:2px 8px;border-radius:999px;">Reason: [REASON_APPLIED]</span>
+                  <span style="background:rgba(0,229,160,.10);border:1px solid #00e5a0;color:#00e5a0;padding:2px 8px;border-radius:999px;">Credit: $[CREDIT_AMOUNT_USD]</span>
+                </div>
+                <div style="margin-top:10px;font-size:11px;color:#8aa0c2;">Ref [REFERENCE_ID] · confirmation sent to [CUSTOMER_EMAIL]</div>
+              </div>
+
+        actions:
+            get_order_status: @actions.get_order_status
+                description: "Look up order status, courier telemetry and SLA state for a case."
+                with caseId = ...
+                with orderNumber = ...
+
+            apply_refund_or_credit: @actions.apply_refund_or_credit
+                description: "Apply a refund or goodwill credit per Pronto policy."
+                with caseId = ...
+                with customerEmail = ...
+                with reason = ...
+
+    actions:
+        get_order_status:
+            description: "Look up Pronto order details, courier telemetry, missing-item state and SLA breach state for the case."
+            label: "Get Order Status"
+            target: "apex://GetOrderStatus"
+            include_in_progress_indicator: True
+            progress_indicator_message: "Looking up order…"
+            inputs:
+                caseId: string
+                    description: "The Salesforce Case Id driving this inquiry."
+                    label: "Case Id"
+                    is_required: True
+                    complex_data_type_name: "lightning__textType"
+                orderNumber: string
+                    description: "Optional Pronto order number if the user provided one."
+                    label: "Order Number"
+                    is_required: False
+                    complex_data_type_name: "lightning__textType"
+            outputs:
+                orderNumber: string
+                    label: "Order Number"
+                    description: "The looked-up order number."
+                    is_displayable: True
+                    filter_from_agent: False
+                merchant: string
+                    label: "Merchant"
+                    description: "The fulfilling merchant / store name."
+                    is_displayable: True
+                    filter_from_agent: False
+                status: string
+                    label: "Status"
+                    description: "Order status (e.g. Delivered, In transit, Delivered with issues)."
+                    is_displayable: True
+                    filter_from_agent: False
+                courierState: string
+                    label: "Courier State"
+                    description: "Where the courier delivered and any GPS / drop-off issues."
+                    is_displayable: True
+                    filter_from_agent: False
+                slaBreached: boolean
+                    label: "SLA Breached"
+                    description: "Whether the delivery breached the Pronto delivery SLA."
+                    is_displayable: True
+                    filter_from_agent: False
+                missingItems: string
+                    label: "Missing Items"
+                    description: "Comma-separated list of items missing from the delivery."
+                    is_displayable: True
+                    filter_from_agent: False
+                customerMessage: string
+                    label: "Customer Message"
+                    description: "Customer-facing summary of what happened with the order."
+                    is_displayable: True
+                    filter_from_agent: False
+
+        apply_refund_or_credit:
+            description: "Compute and apply a refund or goodwill credit per Pronto policy. Stub — returns hard-coded data, no DML."
+            label: "Apply Refund Or Credit"
+            target: "apex://ApplyRefundOrCredit"
+            include_in_progress_indicator: True
+            progress_indicator_message: "Applying credit…"
+            inputs:
+                caseId: string
+                    description: "The Salesforce Case Id driving the refund."
+                    label: "Case Id"
+                    is_required: True
+                    complex_data_type_name: "lightning__textType"
+                customerEmail: string
+                    description: "Email address to send the refund confirmation to."
+                    label: "Customer Email"
+                    is_required: True
+                    complex_data_type_name: "lightning__textType"
+                reason: string
+                    description: "Reason code: missing_items, sla_delay, wrong_address, or goodwill."
+                    label: "Reason"
+                    is_required: False
+                    complex_data_type_name: "lightning__textType"
+            outputs:
+                outcome: string
+                    label: "Outcome"
+                    description: "Outcome of the refund call (applied / declined)."
+                    is_displayable: True
+                    filter_from_agent: False
+                creditAmountUsd: object
+                    complex_data_type_name: "lightning__numberType"
+                    label: "Credit Amount USD"
+                    description: "Credit amount in USD applied to the customer account."
+                    is_displayable: True
+                    filter_from_agent: False
+                referenceId: string
+                    label: "Reference Id"
+                    description: "Internal reference for the credit transaction."
+                    is_displayable: True
+                    filter_from_agent: False
+                reasonApplied: string
+                    label: "Reason Applied"
+                    description: "Final reason code used to compute the credit."
+                    is_displayable: True
+                    filter_from_agent: False
+                customerMessage: string
+                    label: "Customer Message"
+                    description: "Customer-facing confirmation sentence."
+                    is_displayable: True
+                    filter_from_agent: False
