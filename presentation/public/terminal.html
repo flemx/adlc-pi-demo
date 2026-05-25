@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>pi · live demo</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+        background: radial-gradient(ellipse at top, #0b1020 0%, #05070f 60%, #02030a 100%);
+        color: #e5e7eb;
+        overflow: hidden;
+      }
+
+      .frame {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .titlebar {
+        flex: 0 0 auto;
+        height: 38px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 14px;
+        background: linear-gradient(180deg, rgba(20,28,48,0.95), rgba(10,14,28,0.95));
+        border-bottom: 1px solid rgba(120, 180, 255, 0.12);
+        backdrop-filter: blur(12px);
+      }
+      .lights { display: flex; gap: 8px; }
+      .light { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.35); }
+      .red    { background: #ff5f56; }
+      .yellow { background: #ffbd2e; }
+      .green  { background: #27c93f; }
+      .title  { font-size: 12px; color: #cbd5e1; letter-spacing: 0.6px; font-weight: 500; }
+      .title .accent { color: #00a1e0; }
+      .title .dim    { color: #64748b; }
+      .status {
+        margin-left: auto;
+        display: flex; align-items: center; gap: 8px;
+        font-size: 11px; color: #94a3b8;
+      }
+      .dot {
+        width: 7px; height: 7px; border-radius: 50%;
+        background: #475569; box-shadow: 0 0 0 0 rgba(0,161,224,0);
+        transition: background .2s, box-shadow .25s;
+      }
+      .dot.connected {
+        background: #00e5a0;
+        box-shadow: 0 0 14px rgba(0, 229, 160, 0.55);
+      }
+
+      #term {
+        flex: 1 1 auto;
+        padding: 14px 16px;
+        background:
+          radial-gradient(1200px 400px at 80% -10%, rgba(0,161,224,0.08), transparent 60%),
+          radial-gradient(900px 300px at 0% 110%, rgba(120,80,255,0.08), transparent 60%),
+          #07090f;
+        position: relative;
+        overflow: hidden;
+      }
+      #term canvas { display: block; }
+
+      .hint {
+        position: absolute;
+        bottom: 10px; right: 14px;
+        font-size: 10.5px; color: #475569;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="frame">
+      <div class="titlebar">
+        <div class="lights">
+          <span class="light red"></span>
+          <span class="light yellow"></span>
+          <span class="light green"></span>
+        </div>
+        <div class="title">
+          <span class="accent">●</span> pi
+          <span class="dim">— agentforce/</span>
+          <span class="dim" id="cmdline">$ pi</span>
+        </div>
+        <div class="status">
+          <span class="dot" id="dot"></span>
+          <span id="state">connecting…</span>
+        </div>
+      </div>
+      <div id="term"><div class="hint">click to focus · Ctrl-C to interrupt</div></div>
+    </div>
+
+    <script type="module">
+      // ghostty-web (xterm.js–compatible) loaded from esm.sh.
+      // Falls back to xterm.js if ghostty-web fails to initialize (e.g. WASM
+      // blocked by a strict CSP).
+      const stateEl = document.getElementById('state');
+      const dotEl   = document.getElementById('dot');
+      const termEl  = document.getElementById('term');
+
+      function setStatus(connected, label) {
+        stateEl.textContent = label ?? (connected ? 'connected' : 'disconnected');
+        dotEl.classList.toggle('connected', !!connected);
+      }
+
+      // Theme tuned to match labs.salesforce.com / Cosmos dark
+      const theme = {
+        background:    '#07090f',
+        foreground:    '#e2e8f0',
+        cursor:        '#00a1e0',
+        cursorAccent:  '#0b1020',
+        selectionBackground: 'rgba(0,161,224,0.28)',
+        black:   '#1e293b', red:     '#ff6b6b', green:   '#00e5a0',
+        yellow:  '#ffd166', blue:    '#00a1e0', magenta: '#a78bfa',
+        cyan:    '#22d3ee', white:   '#e2e8f0',
+        brightBlack:   '#475569', brightRed:     '#ff8b8b',
+        brightGreen:   '#5eead4', brightYellow:  '#fde68a',
+        brightBlue:    '#38bdf8', brightMagenta: '#c4b5fd',
+        brightCyan:    '#67e8f9', brightWhite:   '#f8fafc',
+      };
+
+      const baseOpts = {
+        cursorBlink: true,
+        fontSize: 13,
+        fontFamily: 'ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, monospace',
+        letterSpacing: 0,
+        scrollback: 10000,
+        theme,
+        allowProposedApi: true,
+      };
+
+      let term, fit;
+
+      async function bootGhostty() {
+        const mod = await import('https://esm.sh/ghostty-web@latest');
+        const fitMod = await import('https://esm.sh/ghostty-web@latest/addons/fit');
+        await mod.init();
+        term = new mod.Terminal(baseOpts);
+        fit  = new fitMod.FitAddon();
+        term.loadAddon(fit);
+        return 'ghostty-web';
+      }
+
+      async function bootXterm() {
+        // CDN fallback so the demo is resilient
+        const css = document.createElement('link');
+        css.rel = 'stylesheet';
+        css.href = 'https://esm.sh/@xterm/xterm@5.5.0/css/xterm.css';
+        document.head.appendChild(css);
+        const xt = await import('https://esm.sh/@xterm/xterm@5.5.0');
+        const fitMod = await import('https://esm.sh/@xterm/addon-fit@0.10.0');
+        term = new xt.Terminal(baseOpts);
+        fit  = new fitMod.FitAddon();
+        term.loadAddon(fit);
+        return 'xterm.js';
+      }
+
+      let backend = 'ghostty-web';
+      try {
+        backend = await bootGhostty();
+      } catch (e) {
+        console.warn('[term] ghostty-web init failed, falling back to xterm.js', e);
+        backend = await bootXterm();
+      }
+      console.log('[term] backend =', backend);
+
+      term.open(termEl);
+      const doFit = () => { try { fit.fit(); } catch {} };
+      doFit();
+
+      // Resize observer — covers iframe size changes too
+      const ro = new ResizeObserver(doFit);
+      ro.observe(termEl);
+      window.addEventListener('resize', doFit);
+
+      // ---- WebSocket plumbing -------------------------------------------------
+      let ws;
+      let reconnectTimer;
+
+      function connect() {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const url = `${proto}//${location.host}/ws?cols=${term.cols}&rows=${term.rows}`;
+        ws = new WebSocket(url);
+
+        ws.onopen = () => {
+          setStatus(true, `live · ${backend}`);
+          term.focus();
+        };
+        ws.onmessage = (ev) => term.write(typeof ev.data === 'string' ? ev.data : new Uint8Array(ev.data));
+        ws.onerror = () => setStatus(false, 'error');
+        ws.onclose = () => {
+          setStatus(false, 'disconnected · retrying');
+          clearTimeout(reconnectTimer);
+          reconnectTimer = setTimeout(connect, 2500);
+        };
+      }
+
+      term.onData((d) => { if (ws && ws.readyState === 1) ws.send(d); });
+      term.onResize(({ cols, rows }) => {
+        if (ws && ws.readyState === 1) {
+          ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+        }
+      });
+
+      connect();
+    </script>
+  </body>
+</html>
