@@ -127,11 +127,13 @@ export async function GET(_req: NextRequest) {
     // are live — fall back to returning everything so the user can still see
     // the org, and surface the failure via `versionQueryFailed`.
 
-    const visible = versions.ok
-      ? defs.records.filter((d) => (activeByDef.get(d.Id) ?? 0) > 0)
-      : defs.records;
-
-    const agents = visible.map((d) => ({
+    // We used to drop agents with no Active version, but the connected-app
+    // integration user often has narrower BotVersion read access than the
+    // human running `sf` CLI. That meant agents like ProntoOrderSupport —
+    // which were genuinely active in the org — simply vanished here. Now we
+    // surface every definition we can read; activeVersion = 0 just means
+    // "we couldn't confirm an active version", not "there isn't one".
+    const agents = defs.records.map((d) => ({
       id: d.Id,
       label: d.MasterLabel || d.DeveloperName,
       developerName: d.DeveloperName,
@@ -145,6 +147,9 @@ export async function GET(_req: NextRequest) {
       instanceUrl,
       agents,
       versionQueryFailed: !versions.ok,
+      // Surface the count so the UI can hint when the version query came back
+      // empty (perms / sharing) vs definitions also being empty.
+      versionRowsSeen: versions.ok ? versions.records.length : 0,
     });
   } catch (err: any) {
     if (err instanceof ConfigErrorThrown) {

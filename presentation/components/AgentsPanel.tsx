@@ -102,7 +102,9 @@ export function AgentsPanel({
                   <div className="agent-row-head">
                     <span className="agent-row-icon" aria-hidden>✦</span>
                     <div className="agent-row-name">{a.label}</div>
-                    <span className="pill pill-blue mono">v{a.activeVersion}</span>
+                    <span className={`pill mono ${a.activeVersion > 0 ? "pill-blue" : "pill-muted"}`}>
+                      {a.activeVersion > 0 ? `v${a.activeVersion}` : "v?"}
+                    </span>
                   </div>
                   <div className="agent-row-meta mono">{a.developerName}</div>
                   {a.description && (

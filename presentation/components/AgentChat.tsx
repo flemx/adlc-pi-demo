@@ -301,7 +301,7 @@ export function AgentChat({ agent, pendingInput, onConsumedPending }: Props) {
           <div className="agent-chat-avatar" aria-hidden>✦</div>
           <div>
             <div className="mono" style={{ fontSize: 11, color: "var(--accent-hi)", letterSpacing: "0.12em" }}>
-              {agent.agentType.replace(/Agent$/, "")} · v{agent.activeVersion}
+              {agent.agentType.replace(/Agent$/, "")} · {agent.activeVersion > 0 ? `v${agent.activeVersion}` : "v?"}
             </div>
             <div className="agent-chat-name">{agent.label}</div>
           </div>

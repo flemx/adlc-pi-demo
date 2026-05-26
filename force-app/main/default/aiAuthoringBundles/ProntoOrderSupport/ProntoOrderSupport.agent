@@ -1,0 +1,122 @@
+config:
+    developer_name: "ProntoOrderSupport"
+    agent_label: "Pronto Order Support"
+    agent_type: "AgentforceEmployeeAgent"
+    description: "Resolves Pronto delivery cases end to end — looks up the order and applies a refund or goodwill credit."
+
+system:
+    instructions: |
+        You are Pronto Order Support, a Salesforce service agent that resolves
+        Pronto food-delivery cases for the Morgan Household at Artisan's Edge.
+        Be calm, concise, empathetic. Always end your final reply with the
+        self-contained HTML card described in the order_resolution subagent.
+    messages:
+        welcome: "Hi — I'm Pronto Order Support. I can look up your order and apply a refund or credit if something went wrong."
+        error:   "Sorry, something went wrong on my side. A human teammate will follow up."
+
+language:
+    default_locale: "en_US"
+    additional_locales: ""
+    all_additional_locales: False
+
+start_agent order_resolution:
+    label: "Order Resolution"
+    description: "Resolves Pronto delivery cases end to end."
+    reasoning:
+        instructions: ->
+            | Step-by-step:
+              1. Call get_order_status with the current Case Id. This returns
+                 orderNumber, status, merchantName, slaMinutesOver, and
+                 recommendedRemedy.
+              2. If recommendedRemedy is one of full_refund, prorated_credit,
+                 or goodwill_credit, immediately call apply_refund_or_credit
+                 with the same caseId, the customer's email, and the
+                 recommendedRemedy as the reason. If recommendedRemedy is
+                 none, skip step 2.
+              3. Compose your final reply as a SINGLE self-contained HTML
+                 card and emit ONLY that HTML — no markdown, no code fences,
+                 no surrounding prose. Use this exact template, filling in
+                 the bracketed values from the action results:
+
+              <div style="font-family:-apple-system,Segoe UI,Inter,sans-serif;background:#0b1220;color:#e6eefb;border:1px solid #1f2d4d;border-left:4px solid #00a1e0;border-radius:10px;padding:14px 16px;max-width:520px;"><div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#38bdf8;font-weight:600;margin-bottom:4px;">Pronto Order Support</div><div style="font-size:15px;font-weight:600;margin-bottom:8px;">Order [ORDER_NUMBER] — [STATUS]</div><div style="color:#8aa0c2;font-size:12.5px;line-height:1.5;margin-bottom:10px;">[SHORT_FRIENDLY_EXPLANATION_AND_WHAT_YOU_APPLIED]</div><div><span style="display:inline-block;background:#0f2138;color:#38bdf8;border:1px solid #1f3a5e;border-radius:999px;padding:2px 10px;font-size:11px;margin-right:6px;">Reference: [REFERENCE_ID]</span><span style="display:inline-block;background:#0f2138;color:#38bdf8;border:1px solid #1f3a5e;border-radius:999px;padding:2px 10px;font-size:11px;">Sent to: [CONFIRMATION_EMAIL]</span></div></div>
+
+              If you skipped step 2 (no remedy), drop the two pill spans and
+              keep the rest of the card.
+        actions:
+            get_order_status: @actions.get_order_status
+                with caseId = ...
+            apply_refund_or_credit: @actions.apply_refund_or_credit
+                with caseId = ...
+                with customerEmail = ...
+                with reason = ...
+
+    actions:
+        get_order_status:
+            description: "Resolves the Pronto order tied to a case and returns status + recommended remedy."
+            label: "Get Order Status"
+            target: "apex://GetOrderStatus"
+            include_in_progress_indicator: True
+            progress_indicator_message: "Looking up the order…"
+            inputs:
+                caseId: string
+                    description: "The Salesforce Case Id whose order should be resolved."
+                    label: "Case Id"
+                    is_required: True
+                    complex_data_type_name: "lightning__textType"
+            outputs:
+                orderNumber: object
+                    description: "Pronto order number, e.g. PR-204871."
+                    label: "Order Number"
+                    complex_data_type_name: "lightning__textType"
+                status: object
+                    description: "Current order status, e.g. Delivered with issues."
+                    label: "Status"
+                    complex_data_type_name: "lightning__textType"
+                merchantName: object
+                    description: "Merchant the order came from."
+                    label: "Merchant Name"
+                    complex_data_type_name: "lightning__textType"
+                slaMinutesOver: object
+                    description: "Minutes the order ran over its SLA. 0 if on time."
+                    label: "SLA Minutes Over"
+                    complex_data_type_name: "lightning__numberType"
+                recommendedRemedy: object
+                    description: "Recommended remedy: full_refund | prorated_credit | goodwill_credit | none."
+                    label: "Recommended Remedy"
+                    complex_data_type_name: "lightning__textType"
+
+        apply_refund_or_credit:
+            description: "Applies the refund or goodwill credit recommended by Get Order Status."
+            label: "Apply Refund Or Credit"
+            target: "apex://ApplyRefundOrCredit"
+            include_in_progress_indicator: True
+            progress_indicator_message: "Applying the refund or credit…"
+            inputs:
+                caseId: string
+                    description: "The Salesforce Case Id this remedy is tied to."
+                    label: "Case Id"
+                    is_required: True
+                    complex_data_type_name: "lightning__textType"
+                customerEmail: string
+                    description: "Customer email for the confirmation."
+                    label: "Customer Email"
+                    is_required: True
+                    complex_data_type_name: "lightning__textType"
+                reason: string
+                    description: "The recommendedRemedy from Get Order Status."
+                    label: "Reason"
+                    is_required: True
+                    complex_data_type_name: "lightning__textType"
+            outputs:
+                referenceId: object
+                    description: "Reference id of the credit / refund."
+                    label: "Reference Id"
+                    complex_data_type_name: "lightning__textType"
+                creditAmountUsd: object
+                    description: "Amount credited or refunded, in USD."
+                    label: "Credit Amount Usd"
+                    complex_data_type_name: "lightning__numberType"
+                confirmationSentTo: object
+                    description: "Email address the confirmation was sent to."
+                    label: "Confirmation Sent To"
+                    complex_data_type_name: "lightning__textType"
