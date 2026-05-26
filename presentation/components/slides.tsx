@@ -507,4 +507,55 @@ export const slides: Slide[] = [
       </div>
     ),
   },
+
+  // ── 9 · Thank you ────────────────────────────────────────────
+  {
+    id: "thanks",
+    label: "Thank you",
+    render: () => (
+      <div className="slide-inner thanks-slide">
+        <div className="glow a" />
+        <div className="glow b" />
+
+        <span className="eyebrow">
+          <span className="pulse" /> Salesforce World Tour · Stockholm Breakout
+        </span>
+
+        <h1 className="title-xl">
+          <span className="grad">Thank you.</span>
+        </h1>
+        <p className="kicker" style={{ maxWidth: 720 }}>
+          Now go vibe-code your own Agentforce agent.
+        </p>
+
+        <div className="thanks-row">
+          <div className="thanks-card">
+            <div className="card-eye">Build it yourself</div>
+            <h3>Step-by-step guide</h3>
+            <p className="muted" style={{ fontSize: 14, marginBottom: 14 }}>
+              A deeper walk-through for spinning up an Agentforce service
+              agent from scratch with Claude Code — same loop, same patterns,
+              all the dialect quirks called out.
+            </p>
+            <div className="row" style={{ gap: 8 }}>
+              <span className="chip"><b>Claude Code</b></span>
+              <span className="chip"><b>Agent Script</b></span>
+              <span className="chip"><b>End-to-end</b></span>
+            </div>
+          </div>
+
+          <figure className="thanks-qr">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/qrcode.svg" alt="QR code linking to the Claude Code Agentforce guide" />
+            <figcaption>
+              <span className="mono" style={{ fontSize: 11, letterSpacing: "0.16em", color: "var(--accent-hi)" }}>
+                SCAN ME
+              </span>
+              <span style={{ color: "var(--fg-1)" }}>Try it yourself</span>
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+    ),
+  },
 ];

@@ -1415,3 +1415,48 @@ button { font-family: inherit; }
 @media (max-width: 900px) {
   .slide-astro { transform: scale(0.7); transform-origin: bottom right; }
 }
+
+/* ── Slide 9 · Thank you + QR ───────────────────────────────────────────── */
+.thanks-slide {
+  text-align: left;
+}
+.thanks-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 36px;
+  align-items: center;
+  margin-top: 24px;
+}
+@media (max-width: 900px) {
+  .thanks-row { grid-template-columns: 1fr; justify-items: center; }
+}
+.thanks-card {
+  padding: 22px 24px;
+  border-radius: 16px;
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, rgba(0,161,224,0.06), rgba(11,16,32,0.55));
+}
+.thanks-card h3 { margin: 4px 0 10px; }
+.thanks-qr {
+  margin: 0;
+  padding: 22px;
+  border-radius: 22px;
+  border: 1px solid rgba(0,161,224,0.45);
+  background: #ffffff;
+  box-shadow:
+    0 24px 60px rgba(0,0,0,0.5),
+    0 0 0 1px rgba(0,161,224,0.18) inset,
+    0 0 56px rgba(0,161,224,0.25);
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  width: 380px;
+}
+.thanks-qr img {
+  width: 340px; height: 340px;
+  display: block;
+}
+.thanks-qr figcaption {
+  display: flex; flex-direction: column; gap: 2px;
+  align-items: center;
+  padding: 6px 0 2px;
+  font-size: 13px;
+}
