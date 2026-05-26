@@ -1,11 +1,11 @@
 import * as React from "react";
+import { PixelAstro } from "./PixelAstro";
 
 export type SlideContext = {
   goToTerminal: () => void;
   goToPlanning: () => void;
   goToAgents: () => void;
   runInPi: (prompt: string) => void;
-  sendUtteranceToChat: (text: string) => void;
 };
 
 /** Salesforce org Cases list URL — opened in a new tab from the Plan slide. */
@@ -13,33 +13,41 @@ export const ORG_CASES_URL =
   "https://orgfarm-22ccc7c65d.lightning.force.com/lightning/o/Case/list?filterName=AllOpenCases";
 
 /**
- * Test utterances rendered on the Test slide. Each one provides a realistic
- * caseId + customerEmail combo so the published agent's actions have
- * everything they need without an extra clarifying turn.
- *
- * Edit these to match real Case IDs from the demo org before going live.
+ * Salesforce Cases list view (Lightning) and the Agentforce Studio Agents page
+ * — these get linked from the Plan and Test slides respectively.
  */
-export const TEST_UTTERANCES: { label: string; text: string; caseId: string; email: string }[] = [
+export const AGENTFORCE_STUDIO_URL =
+  "https://orgfarm-22ccc7c65d.lightning.force.com/lightning/n/standard-AgentforceStudio?c__nav=agents";
+
+/**
+ * Test utterances rendered on the Test slide. Each one references a Case by
+ * its human-readable Case Number (e.g. 00001001), not the 18-char record id
+ * — that's what a real customer would type in chat. The agent's actions
+ * resolve the Case via SOQL on CaseNumber.
+ *
+ * Edit these to match real Case Numbers from the demo org before going live.
+ */
+export const TEST_UTTERANCES: { label: string; text: string; caseNumber: string; email: string }[] = [
   {
     label: "Status check",
-    caseId: "5008z00001abcde",
+    caseNumber: "00001001",
     email: "alice@example.com",
     text:
-      "Hi, I'd like a status update on case 5008z00001abcde. The customer is alice@example.com — please look it up and let her know where things stand.",
+      "Hi, I'd like a status update on case 00001001. The customer is alice@example.com — please look it up and let her know where things stand.",
   },
   {
     label: "Apologise + acknowledge",
-    caseId: "5008z00001fghij",
+    caseNumber: "00001002",
     email: "bob@example.com",
     text:
-      "Please acknowledge case 5008z00001fghij for bob@example.com. Apologise for the wait and confirm we're working on it.",
+      "Please acknowledge case 00001002 for bob@example.com. Apologise for the wait and confirm we're working on it.",
   },
   {
     label: "Apply credit",
-    caseId: "5008z00001klmno",
+    caseNumber: "00001003",
     email: "carol@example.com",
     text:
-      "Apply a goodwill credit on case 5008z00001klmno for carol@example.com — small amount, with a polite confirmation reply.",
+      "Apply a goodwill credit on case 00001003 for carol@example.com — small amount, with a polite confirmation reply.",
   },
 ];
 
@@ -191,6 +199,7 @@ export const slides: Slide[] = [
       <div className="slide-inner">
         <div className="glow a" />
         <div className="glow b" />
+        <PixelAstro className="slide-astro" size={260} />
         <span className="eyebrow">
           <span className="pulse" /> Salesforce World Tour · Stockholm Breakout
         </span>
@@ -255,66 +264,59 @@ export const slides: Slide[] = [
     ),
   },
 
-  // ── 3 · Build with any agent ────────────────────────────────────────────
+  // ── 3 · Build with any agent ──────────────────────────────
   {
     id: "agents",
     label: "Build with any agent",
     render: () => (
       <div className="slide-inner">
         <span className="eyebrow"><span className="pulse" /> Bring your own coding agent</span>
-        <h2 className="title-lg">Salesforce + the agent of your choice.</h2>
-        <p className="kicker">
-          Headless 360 doesn’t lock you into one vendor. Any tool that speaks
-          MCP or shells out to <span className="mono">sf</span> can drive the
-          platform — and they all share the same auth, governance, and metadata.
+        <h2 className="title-lg">Pick the tool. The platform is the same.</h2>
+
+        <div className="showcase">
+          <figure className="showcase-card">
+            <div className="showcase-frame">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/claude_code_terminal.png" alt="Claude Code terminal" />
+            </div>
+            <figcaption>
+              <span className="showcase-eye">Anthropic</span>
+              <span className="showcase-name">Claude Code</span>
+            </figcaption>
+          </figure>
+
+          <figure className="showcase-card">
+            <div className="showcase-frame">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/vibes2.png" alt="Agentforce Vibes 2.0" />
+            </div>
+            <figcaption>
+              <span className="showcase-eye">Salesforce native</span>
+              <span className="showcase-name">Agentforce Vibes 2.0</span>
+            </figcaption>
+          </figure>
+
+          <figure className="showcase-card">
+            <div className="showcase-frame">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/agent_builder.png" alt="Agentforce Agent Builder" />
+            </div>
+            <figcaption>
+              <span className="showcase-eye">No-code</span>
+              <span className="showcase-name">Agent Builder</span>
+            </figcaption>
+          </figure>
+        </div>
+
+        <p className="kicker showcase-foot">
+          Same auth, same metadata, same governance — swap the agent without
+          swapping the platform.
         </p>
-
-        <div className="grid-3">
-          <div className="card">
-            <div className="icon">🤖</div>
-            <div className="card-eye">Anthropic</div>
-            <h3>Claude Code</h3>
-            <p>Connect to Salesforce-hosted MCP. Read SOQL, scaffold Apex, deploy from a prompt.</p>
-          </div>
-          <div className="card violet">
-            <div className="icon">⌬</div>
-            <div className="card-eye">OpenAI</div>
-            <h3>Codex / GPT-5</h3>
-            <p>Same MCP surface, same CLI. Same governance trail in Setup Audit.</p>
-          </div>
-          <div className="card pink">
-            <div className="icon">✦</div>
-            <div className="card-eye">Salesforce native</div>
-            <h3>Agentforce Vibes</h3>
-            <p>The first-party vibe-coding experience — built into the platform.</p>
-          </div>
-        </div>
-
-        <div className="grid-2" style={{ marginTop: 4 }}>
-          <div className="card amber">
-            <div className="card-eye">In this demo</div>
-            <h3>We use <span className="mono">sf-pi</span></h3>
-            <p>
-              Salesforce’s open-source coding-agent harness. Wraps Claude /
-              GPT-5 / Gemini, ships with Salesforce-aware guardrails, MCP
-              connectors, and the full <span className="mono">sf</span> CLI in
-              one terminal-native loop.
-            </p>
-          </div>
-          <div className="card">
-            <div className="card-eye">Why pi for Agentforce</div>
-            <ul className="bullets">
-              <li><b>Agent Script</b> authoring tools (compile, preview, eval, publish)</li>
-              <li><b>Data 360</b> + <b>Browser</b> + <b>Slack</b> extensions baked in</li>
-              <li><b>Operator kernel</b> — retrieve before edit, describe before query</li>
-            </ul>
-          </div>
-        </div>
       </div>
     ),
   },
 
-  // ── 4 · Meet sf-pi ───────────────────────────────────────────────────────
+  // ── 4 · Meet sf-pi ───────────────────────────────────────────
   {
     id: "sf-pi",
     label: "Meet sf-pi",
@@ -322,99 +324,68 @@ export const slides: Slide[] = [
       <div className="slide-inner">
         <span className="eyebrow"><span className="pulse" /> github.com/salesforce/sf-pi</span>
         <h2 className="title-lg">
-          <span className="grad">sf-pi</span> — your Agentforce dev loop, in one terminal.
+          For this demo — <span className="grad">sf-pi</span>.
         </h2>
-        <p className="kicker">
-          A coding agent that knows Salesforce. It speaks MCP to the platform,
-          drives the <span className="mono">sf</span> CLI safely, and ships with
-          16 first-party extensions so you can stay in flow from prompt → live
-          agent.
-        </p>
 
-        <div className="grid-2">
-          <div className="card">
-            <div className="icon">🛰️</div>
-            <div className="card-eye">Headless 360 native</div>
-            <h3>MCP + sf CLI, governed</h3>
-            <p>Connects to Salesforce-hosted MCP servers and your local <span className="mono">sf</span> session. Production-org calls gated by a guardrail that classifies dangerous and destructive commands.</p>
+        <div className="hero-split">
+          <div className="hero-art">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/pi-agent.jpg" alt="sf-pi agent" />
           </div>
-          <div className="card violet">
-            <div className="icon">🧬</div>
-            <div className="card-eye">Agentforce-aware</div>
-            <h3><span className="mono">.agent</span> bundles, end-to-end</h3>
-            <p>
-              <span className="mono">agentscript_authoring</span> ·{" "}
-              <span className="mono">_preview</span> ·{" "}
-              <span className="mono">_eval</span> ·{" "}
-              <span className="mono">_lifecycle</span> — author, simulate, regress,
-              publish, activate. No tab-switching to Setup.
-            </p>
-          </div>
-          <div className="card teal">
-            <div className="icon">📡</div>
-            <div className="card-eye">Data 360</div>
-            <h3>Live data, queryable</h3>
-            <p>Discover DMOs, run Data 360 SQL, inspect Agentforce STDM session traces — straight from the prompt.</p>
-          </div>
-          <div className="card pink">
-            <div className="icon">🪟</div>
-            <div className="card-eye">Browser fallback</div>
-            <h3>UI when APIs end</h3>
-            <p>Drives Lightning Setup with an accessibility-tree browser when there’s no API yet. Last-mile, but still scripted.</p>
+          <div className="hero-points">
+            <ul className="hero-bullets">
+              <li><b>Agentforce-aware.</b> <span className="mono">.agent</span> bundles, end-to-end — author, validate, publish, activate.</li>
+              <li><b>Headless 360 native.</b> MCP + the full <span className="mono">sf</span> CLI, with a guardrail in front of every destructive call.</li>
+              <li><b>Open source.</b> Wraps Claude / GPT-5 / Gemini. Stay in your terminal.</li>
+            </ul>
           </div>
         </div>
       </div>
     ),
   },
 
-  // ── 5 · The dev loop ─────────────────────────────────────────────────────
+  // ── 5 · The dev loop ───────────────────────────────────────
   {
     id: "loop",
     label: "Dev loop",
     render: () => (
       <div className="slide-inner">
-        <span className="eyebrow"><span className="pulse" /> Plan · Build · Test</span>
+        <span className="eyebrow"><span className="pulse" /> Agent Development Lifecycle</span>
         <h2 className="title-lg">One loop, three phases.</h2>
-        <p className="kicker">
-          For the rest of the demo we’ll walk this loop end-to-end against a
-          live org. <span className="mono">pi</span> plans by reading the org,
-          builds by scaffolding the agent, and tests by previewing it.
-        </p>
 
-        <div className="flow flow-3">
-          <div className="step phase teal">
-            <div className="n">PHASE 01</div>
-            <div className="l">Plan</div>
-            <div className="s">Read the cases · find the deflection · write a plan</div>
+        <div className="loop-3">
+          <div className="loop-box teal">
+            <div className="loop-box-num">01</div>
+            <div className="loop-box-name">Plan</div>
+            <div className="loop-box-skill mono">sf data query</div>
           </div>
-          <div className="step phase violet">
-            <div className="n">PHASE 02</div>
-            <div className="l">Build</div>
-            <div className="s">Scaffold actions · author agent · publish</div>
+          <div className="loop-arrow" aria-hidden>→</div>
+          <div className="loop-box violet">
+            <div className="loop-box-num">02</div>
+            <div className="loop-box-name">Build</div>
+            <div className="loop-box-skill mono">sf-agentscript</div>
           </div>
-          <div className="step phase pink">
-            <div className="n">PHASE 03</div>
-            <div className="l">Test</div>
-            <div className="s">Preview · eval · ship the version</div>
+          <div className="loop-arrow" aria-hidden>→</div>
+          <div className="loop-box pink">
+            <div className="loop-box-num">03</div>
+            <div className="loop-box-name">Test</div>
+            <div className="loop-box-skill mono">Agent API</div>
           </div>
         </div>
 
-        <div className="grid-3" style={{ marginTop: 8 }}>
-          <div className="card teal">
-            <div className="card-eye">Up next</div>
-            <h3>Plan · ask pi to analyse</h3>
-            <p>One prompt, one verb. pi reads the case backlog and writes a deflection plan.</p>
-          </div>
-          <div className="card" style={{ opacity: 0.55 }}>
-            <div className="card-eye">Then</div>
-            <h3>Build · scaffold the agent</h3>
-            <p>pi reads the plan and writes Apex actions + an Agentforce service agent.</p>
-          </div>
-          <div className="card" style={{ opacity: 0.4 }}>
-            <div className="card-eye">Finally</div>
-            <h3>Test · validate live</h3>
-            <p>Preview the published agent against the org and watch it deflect.</p>
-          </div>
+        <div className="loop-footer">
+          <a
+            href="https://github.com/SalesforceAIResearch/agentforce-adlc"
+            target="_blank"
+            rel="noreferrer"
+            className="loop-footer-link"
+          >
+            <span className="mono muted" style={{ letterSpacing: "0.16em", fontSize: 11 }}>
+              ADLC
+            </span>
+            <span style={{ color: "var(--fg-2)" }}>Agentforce Agent Development Lifecycle</span>
+            <span className="muted">↗</span>
+          </a>
         </div>
       </div>
     ),
@@ -481,7 +452,7 @@ export const slides: Slide[] = [
   {
     id: "test-run",
     label: "Test · Talk to it",
-    render: ({ goToAgents, sendUtteranceToChat }) => (
+    render: ({ goToAgents }) => (
       <div className="slide-inner">
         <span className="eyebrow" style={{ color: "var(--pink)" }}>
           <span className="pulse" /> Phase 03 · Test
@@ -490,14 +461,20 @@ export const slides: Slide[] = [
           Now <span className="grad">talk to it</span>.
         </h2>
 
-        <p className="kicker" style={{ marginBottom: 18 }}>
-          The <span className="mono">Agents</span> tab queries the org for every
-          active service agent and opens a real chat session against the
-          <span className="mono">/einstein/ai-agent/v1</span> API. Try the
-          example utterances below — each one provides the
-          {" "}<span className="mono">caseId</span> and
-          {" "}<span className="mono">customerEmail</span> the agent's actions need.
-        </p>
+        <div className="row" style={{ margin: "6px 0 22px", gap: 10 }}>
+          <button className="btn primary" onClick={goToAgents}>
+            ✨ Open the agent chat
+          </button>
+          <a
+            className="btn"
+            href={AGENTFORCE_STUDIO_URL}
+            target="_blank"
+            rel="noreferrer"
+            title="Open Agentforce Studio (Agents) in a new tab"
+          >
+            ↗ Agentforce Studio
+          </a>
+        </div>
 
         <div className="utterances">
           {TEST_UTTERANCES.map((u, i) => (
@@ -505,13 +482,13 @@ export const slides: Slide[] = [
               <div className="utterance-head">
                 <span className="chip pink"><b>#{i + 1} · {u.label}</b></span>
                 <span className="mono muted" style={{ fontSize: 11 }}>
-                  case {u.caseId} · {u.email}
+                  case {u.caseNumber} · {u.email}
                 </span>
               </div>
               <p className="utterance-text">
                 {renderHighlighted(
                   u.text
-                    .replace(u.caseId, `**${u.caseId}**`)
+                    .replace(u.caseNumber, `**${u.caseNumber}**`)
                     .replace(u.email, `**${u.email}**`),
                 )}
               </p>
@@ -523,23 +500,9 @@ export const slides: Slide[] = [
                 >
                   ⧉ Copy
                 </button>
-                <button
-                  className="btn primary"
-                  onClick={() => sendUtteranceToChat(u.text)}
-                  title="Open the Agents tab and pre-fill this utterance"
-                >
-                  ⚡ Send to chat
-                </button>
               </div>
             </div>
           ))}
-        </div>
-
-        <div className="row" style={{ marginTop: 22, justifyContent: "center" }}>
-          <button className="btn primary" onClick={goToAgents}>
-            ✨ Open the agent chat
-          </button>
-          <span className="chip">opens the <b>Agents</b> tab</span>
         </div>
       </div>
     ),

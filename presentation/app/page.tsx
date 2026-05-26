@@ -14,19 +14,10 @@ export default function Home() {
   const [tab, setTab] = React.useState<TabId>("slides");
   const terminalRef = React.useRef<TerminalHandle | null>(null);
 
-  // Pre-fill the chat input on the Agents tab when a slide test-utterance
-  // button is clicked. Cleared as soon as <AgentChat> consumes it.
-  const [pendingUtterance, setPendingUtterance] = React.useState<string | undefined>();
-
   const goToSlides   = React.useCallback(() => setTab("slides"), []);
   const goToPlanning = React.useCallback(() => setTab("planning"), []);
   const goToAgents   = React.useCallback(() => setTab("agents"), []);
   const goToTerminal = React.useCallback(() => setTab("terminal"), []);
-
-  const sendUtteranceToChat = React.useCallback((text: string) => {
-    setPendingUtterance(text);
-    setTab("agents");
-  }, []);
 
   /**
    * Switch to the Live demo tab and run `pi "<prompt>"` at the shell prompt.
@@ -62,7 +53,12 @@ export default function Home() {
     <main className="shell">
       <header className="topbar">
         <div className="brand">
-          <div className="mark" aria-hidden>✦</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            className="brand-logo"
+            src="/images/salesforce-logo.png"
+            alt="Salesforce"
+          />
           <div className="name">
             Headless 360 · <em>Agentforce vibe coding with sf-pi</em>
           </div>
@@ -73,7 +69,7 @@ export default function Home() {
           <TabButton id="planning" tab={tab} onClick={goToPlanning}>📁 Planning</TabButton>
           <TabButton id="agents"   tab={tab} onClick={goToAgents}>✦ Agents</TabButton>
           <TabButton id="terminal" tab={tab} onClick={goToTerminal}>
-            ⚡ Live demo <span className="badge">PTY</span>
+            ⚡ Live demo <span className="badge">pi</span>
           </TabButton>
         </nav>
 
@@ -89,18 +85,13 @@ export default function Home() {
             goToPlanning={goToPlanning}
             goToAgents={goToAgents}
             runInPi={runInPi}
-            sendUtteranceToChat={sendUtteranceToChat}
           />
         </div>
         <div className={`panel ${tab === "planning" ? "active" : ""}`}>
           <Planning active={tab === "planning"} />
         </div>
         <div className={`panel ${tab === "agents"   ? "active" : ""}`}>
-          <AgentsPanel
-            active={tab === "agents"}
-            pendingUtterance={pendingUtterance}
-            onConsumedUtterance={() => setPendingUtterance(undefined)}
-          />
+          <AgentsPanel active={tab === "agents"} />
         </div>
         <div className={`panel ${tab === "terminal" ? "active" : ""}`}>
           <TerminalFrame ref={terminalRef} active={tab === "terminal"} />

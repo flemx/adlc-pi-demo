@@ -37,6 +37,23 @@ function md(s: string): string {
   return marked.parse(s, { async: false }) as string;
 }
 
+/**
+ * Convert the upstream `messages[]` from the session-start response into our
+ * client-side ChatMessage shape. Each entry is typically an Inform / Inquire
+ * shaped object with `id`, `message`, and an optional `result[]`.
+ */
+function mapWelcome(messages: any[] | undefined): ChatMessage[] {
+  if (!Array.isArray(messages)) return [];
+  return messages
+    .filter((m) => m && typeof m.message === "string" && m.message.length > 0)
+    .map((m, i) => ({
+      id: m.id || `welcome-${i}`,
+      role: "agent" as const,
+      content: m.message as string,
+      toolOutputs: Array.isArray(m.result) ? m.result : [],
+    }));
+}
+
 export function AgentChat({ agent, pendingInput, onConsumedPending }: Props) {
   const [sessionId, setSessionId] = React.useState<string | null>(null);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
@@ -78,6 +95,10 @@ export function AgentChat({ agent, pendingInput, onConsumedPending }: Props) {
           return;
         }
         setSessionId(data.sessionId);
+        // The session response includes the agent's welcome message(s) in
+        // `messages[]` (Inform / Inquire shaped). Surface them right away.
+        const welcome = mapWelcome(data.messages);
+        if (welcome.length) setMessages(welcome);
       } catch (err: any) {
         if (cancelled) return;
         setBootError(err?.message || "session start failed");
@@ -266,6 +287,8 @@ export function AgentChat({ agent, pendingInput, onConsumedPending }: Props) {
         return;
       }
       setSessionId(data.sessionId);
+      const welcome = mapWelcome(data.messages);
+      if (welcome.length) setMessages(welcome);
     } catch (err: any) {
       setBootError(err?.message || "session start failed");
     }

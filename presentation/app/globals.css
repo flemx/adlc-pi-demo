@@ -102,6 +102,14 @@ button { font-family: inherit; }
   box-shadow: var(--accent-glow);
   font-size: 14px;
 }
+.brand-logo {
+  height: 28px;
+  width: auto;
+  display: block;
+  /* The original logo art is white-on-blue with whitespace; this drops the
+     baseline cleanly into our dark topbar. */
+  filter: drop-shadow(0 1px 4px rgba(0,161,224,0.18));
+}
 .brand .name { font-size: 14px; }
 .brand .name em { font-style: normal; color: var(--fg-2); font-weight: 400; }
 
@@ -181,6 +189,8 @@ button { font-family: inherit; }
 .slide-inner {
   width: 100%; max-width: 1100px;
   display: grid; gap: 28px;
+  /* Anchor for absolutely-positioned slide ornaments (.glow, .slide-astro). */
+  position: relative;
 }
 
 .eyebrow {
@@ -1171,4 +1181,237 @@ button { font-family: inherit; }
   background: rgba(255, 79, 156, 0.14);
   border-color: rgba(255, 79, 156, 0.45);
   color: #ffe6f0;
+}
+
+/* ── Slide 5 simplified loop ────────────────────────────────────────────── */
+.loop-3 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin: 44px 0 18px;
+  flex-wrap: wrap;
+}
+.loop-box {
+  flex: 0 0 240px;
+  height: 220px;
+  border-radius: 18px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  background: rgba(11,16,32,0.6);
+  position: relative;
+  overflow: hidden;
+}
+.loop-box::before {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(circle at 30% 20%, currentColor 0%, transparent 60%);
+  opacity: 0.18;
+  pointer-events: none;
+}
+.loop-box.teal { color: var(--teal); border-color: rgba(72, 217, 199, 0.45); }
+.loop-box.violet { color: var(--violet); border-color: rgba(178, 132, 255, 0.45); }
+.loop-box.pink { color: var(--pink); border-color: rgba(255, 79, 156, 0.45); }
+.loop-box-num {
+  font-family: var(--font-mono);
+  font-size: 14px; letter-spacing: 0.18em; opacity: 0.85;
+}
+.loop-box-name {
+  font-size: 44px; font-weight: 700; color: var(--fg-0);
+  letter-spacing: -0.02em;
+}
+.loop-arrow {
+  font-size: 28px; color: var(--fg-3);
+  user-select: none;
+}
+.loop-box-skill {
+  margin-top: 4px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--fg-2);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid var(--line);
+  z-index: 1;
+}
+.loop-footer {
+  display: flex; justify-content: center;
+  margin-top: 8px;
+}
+.loop-footer-link {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.02);
+  color: var(--fg-1);
+  text-decoration: none;
+  font-size: 13px;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.loop-footer-link:hover {
+  background: rgba(0,161,224,0.08);
+  border-color: rgba(0,161,224,0.45);
+  color: var(--accent-hi);
+}
+.loop-footer-link:hover .muted { color: var(--accent-hi); }
+
+/* ── Slide 3: agent-tool showcase row ───────────────────────────────────── */
+.showcase {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin: 28px 0 20px;
+  /* If the viewport is narrow, allow horizontal scroll instead of cramping.  */
+  min-height: 0;
+}
+@media (max-width: 980px) {
+  .showcase {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 6px;
+  }
+  .showcase-card { flex: 0 0 80%; scroll-snap-align: start; }
+}
+.showcase-card {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: rgba(11,16,32,0.55);
+  overflow: hidden;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.showcase-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0,161,224,0.4);
+}
+.showcase-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: rgba(2,3,10,0.7);
+  overflow: hidden;
+}
+.showcase-frame img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+}
+.showcase-card figcaption {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+}
+.showcase-eye {
+  font-size: 10px; letter-spacing: 0.18em;
+  color: var(--accent-hi); font-weight: 700; text-transform: uppercase;
+}
+.showcase-name {
+  font-size: 16px; font-weight: 600; color: var(--fg-0);
+  letter-spacing: -0.01em;
+}
+.showcase-foot {
+  text-align: center;
+  font-size: 14px;
+  margin-top: 4px;
+  opacity: 0.8;
+}
+
+/* ── Slide 4: pi hero split ─────────────────────────────────────────────── */
+.hero-split {
+  display: grid;
+  grid-template-columns: minmax(280px, 480px) 1fr;
+  gap: 36px;
+  align-items: center;
+  margin-top: 28px;
+}
+@media (max-width: 900px) {
+  .hero-split { grid-template-columns: 1fr; }
+}
+.hero-art {
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(0,161,224,0.45);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.45),
+              inset 0 0 0 1px rgba(0,161,224,0.15);
+  background: rgba(2,3,10,0.7);
+}
+.hero-art img {
+  width: 100%; height: auto;
+  display: block;
+}
+.hero-points { display: flex; flex-direction: column; gap: 14px; }
+.hero-bullets {
+  list-style: none;
+  margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.hero-bullets li {
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--fg-1);
+  padding-left: 22px;
+  position: relative;
+}
+.hero-bullets li::before {
+  content: "✦";
+  position: absolute; left: 0; top: 1px;
+  color: var(--accent-hi);
+  font-size: 14px;
+}
+.hero-bullets li b { color: var(--fg-0); font-weight: 600; }
+
+/* ── Floating Astro mascot (slide 1) ───────────────────────────── */
+.pixel-astro {
+  position: relative;
+  display: inline-block;
+  user-select: none;
+  pointer-events: none;
+}
+.pixel-astro-sprite {
+  display: block;
+  /* Smooth float — ease-in-out so the sprite hangs at the apex for a beat,
+     like it's gently weightless. The layered drop-shadows give it the
+     Salesforce-blue halo without tinting the sprite itself. */
+  animation: pixel-bob 3.6s ease-in-out infinite;
+  filter:
+    drop-shadow(0 8px 18px rgba(0, 0, 0, 0.45))
+    drop-shadow(0 0 24px rgba(0, 161, 224, 0.45))
+    drop-shadow(0 0 56px rgba(0, 161, 224, 0.28));
+}
+.pixel-astro-shadow {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 58%;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 70%);
+  animation: pixel-bob-shadow 3.6s ease-in-out infinite;
+}
+@keyframes pixel-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-12px); }
+}
+@keyframes pixel-bob-shadow {
+  0%, 100% { width: 58%; opacity: 0.55; }
+  50%      { width: 44%; opacity: 0.32; }
+}
+
+/* Slide-1 placement: tight to the bottom-right corner so the sprite reads as
+   a mascot peeking into the slide. z-index keeps it above the corner glows. */
+.slide-astro {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+}
+@media (max-width: 900px) {
+  .slide-astro { transform: scale(0.7); transform-origin: bottom right; }
 }

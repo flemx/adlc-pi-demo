@@ -55,7 +55,15 @@ export async function POST(req: NextRequest) {
     let parsed: any;
     try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
 
-    return Response.json({ ok: true, sessionId: parsed.sessionId, instanceUrl });
+    // The session-start response includes the agent's welcome / greeting
+    // message(s) in `messages[]`. Pass them through so the UI can render them
+    // immediately, no extra round-trip.
+    return Response.json({
+      ok: true,
+      sessionId: parsed.sessionId,
+      instanceUrl,
+      messages: Array.isArray(parsed.messages) ? parsed.messages : [],
+    });
   } catch (err: any) {
     if (err instanceof ConfigErrorThrown) {
       return Response.json(err.payload, { status: 503 });
