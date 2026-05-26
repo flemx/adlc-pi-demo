@@ -1,46 +1,33 @@
 import { NextRequest } from "next/server";
-import { ConfigErrorThrown, getAccessToken } from "@/lib/agentforceAuth";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
 /**
  * GET /api/agents
  *
- * 1. Query BotDefinition directly for agents of a service-agent type.
- * 2. Query BotVersion for the Active versions of those agents and merge in
- *    the highest active VersionNumber.
+ * Lists service agents in the org by shelling out to `sf data query`. We use
+ * the presenter's existing CLI auth instead of the Connected App's OAuth
+ * client_credentials user because sharing rules on `BotDefinition` /
+ * `BotVersion` regularly hide just-published agents from the integration user
+ * even when the human running `sf` CLI sees them fine. Listing parity with
+ * what the presenter sees in their terminal beats the architectural purity
+ * of "everything goes through OAuth".
  *
- * We split into two SOQL calls because BotVersion → BotDefinition
- * relationship traversal in a WHERE clause is unreliable across orgs / API
- * versions. Two simple queries are 100 % portable.
+ * The chat endpoints (/api/agents/session, /api/agents/message) still use
+ * the OAuth token because the global `/einstein/ai-agent/v1` endpoint
+ * requires it.
  *
- * Response shape on success:
- *   {
- *     ok: true,
- *     instanceUrl: string,
- *     agents: Array<{
- *       id: string,            // BotDefinition.Id (used as agentId for AgentForce API)
- *       label: string,
- *       developerName: string,
- *       description: string | null,
- *       agentType: string,
- *       activeVersion: number, // 0 = no active version yet
- *     }>,
- *   }
- *
- * On failure: `{ ok:false, error, detail?, missing?, hint?, status }` plus a
- * 4xx/5xx HTTP status the UI can branch on.
+ * Configurable via:
+ *   SF_TARGET_ORG  sf CLI alias / username  (default: 'my-agentforce-org')
  */
 export const dynamic = "force-dynamic";
 
-const API_VERSION = "v62.0";
+const exec = promisify(execFile);
 
-// Only true service agents (the customer-facing ones the demo tab is for).
-// AgentforceEmployeeAgent is excluded — those are internal employee copilots,
-// not the service agents we want to test in this panel.
-const AGENT_TYPES = ["EinsteinServiceAgent"] as const;
+const TARGET_ORG = process.env.SF_TARGET_ORG || "my-agentforce-org";
 
-// NOTE: BotDefinition does NOT have a Description column. Use MasterLabel +
-// DeveloperName for display; the planning HTML / agent docs hold the longer
-// descriptions if we ever want to surface them.
+const AGENT_TYPES = ["AgentforceEmployeeAgent", "EinsteinServiceAgent"] as const;
+
 const DEFINITION_SOQL = `
   SELECT Id, MasterLabel, DeveloperName, AgentType
   FROM BotDefinition
@@ -49,115 +36,93 @@ const DEFINITION_SOQL = `
   LIMIT 200
 `.replace(/\s+/g, " ").trim();
 
-function activeVersionsSoql(ids: string[]) {
-  // Quote and comma-join the ids for the IN clause.
+const VERSIONS_SOQL = (ids: string[]) => {
   const list = ids.map((i) => `'${i.replace(/'/g, "")}'`).join(",");
   return `SELECT BotDefinitionId, VersionNumber FROM BotVersion WHERE Status='Active' AND BotDefinitionId IN (${list})`;
-}
+};
 
-async function soql<T = any>(
-  instanceUrl: string,
-  token: string,
-  query: string,
-): Promise<{ ok: true; records: T[] } | { ok: false; status: number; body: string }> {
-  const url = `${instanceUrl}/services/data/${API_VERSION}/query/?q=${encodeURIComponent(query)}`;
-  const r = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    cache: "no-store",
-  });
-  if (!r.ok) {
-    const body = await r.text().catch(() => "");
-    return { ok: false, status: r.status, body };
+type Record = Record<string, any>;
+
+async function sfQuery<T = Record>(query: string): Promise<{ ok: true; records: T[] } | { ok: false; error: string }> {
+  try {
+    const { stdout } = await exec(
+      "sf",
+      ["data", "query", "--query", query, "--target-org", TARGET_ORG, "--json"],
+      { maxBuffer: 16 * 1024 * 1024 },
+    );
+    const parsed = JSON.parse(stdout);
+    if (parsed.status !== 0) {
+      return { ok: false, error: parsed.message || "sf data query non-zero status" };
+    }
+    return { ok: true, records: parsed.result?.records ?? [] };
+  } catch (err: any) {
+    // execFile rejects on non-zero exit; sf prints JSON to stdout in that case.
+    const stdout = err?.stdout || "";
+    if (stdout) {
+      try {
+        const parsed = JSON.parse(stdout);
+        return { ok: false, error: parsed.message || parsed.name || `sf exit ${err.code}` };
+      } catch {
+        // fall through
+      }
+    }
+    return { ok: false, error: err?.message || "sf CLI invocation failed" };
   }
-  const json = (await r.json()) as { records?: T[] };
-  return { ok: true, records: json.records ?? [] };
 }
 
 export async function GET(_req: NextRequest) {
-  try {
-    const { token, instanceUrl } = await getAccessToken();
+  const defs = await sfQuery<{
+    Id: string;
+    MasterLabel: string;
+    DeveloperName: string;
+    AgentType: string;
+  }>(DEFINITION_SOQL);
 
-    // ── 1. agents matching service-agent types ─────────────────────────────
-    const defs = await soql<{
-      Id: string;
-      MasterLabel: string;
-      DeveloperName: string;
-      AgentType: string;
-    }>(instanceUrl, token, DEFINITION_SOQL);
-
-    if (!defs.ok) {
-      return Response.json(
-        {
-          ok: false,
-          error: `Salesforce BotDefinition query failed: HTTP ${defs.status}`,
-          // Salesforce error bodies are tiny JSON arrays; pass through verbatim.
-          detail: defs.body.slice(0, 800),
-          query: DEFINITION_SOQL,
-          hint:
-            defs.status === 401
-              ? "Connected app token rejected. Verify the OAuth scopes include `api` (and `chatbot_api` + `sfap_api` for chat)."
-              : defs.status === 403
-              ? "Connected-app user is missing read access to BotDefinition. Grant the integration user the 'View All Bot Resources' permission (or assign an Agentforce permission set)."
-              : "Open the dev-server console for the full Salesforce error body, or hit /api/agents directly with curl.",
-        },
-        { status: 502 },
-      );
-    }
-
-    if (defs.records.length === 0) {
-      return Response.json({ ok: true, agents: [], instanceUrl });
-    }
-
-    // ── 2. active versions — also our "is this agent live?" filter ───────
-    const ids = defs.records.map((d) => d.Id);
-    const versions = await soql<{ BotDefinitionId: string; VersionNumber: number }>(
-      instanceUrl,
-      token,
-      activeVersionsSoql(ids),
-    );
-
-    const activeByDef = new Map<string, number>();
-    if (versions.ok) {
-      for (const v of versions.records) {
-        const cur = activeByDef.get(v.BotDefinitionId) ?? 0;
-        if (v.VersionNumber > cur) activeByDef.set(v.BotDefinitionId, v.VersionNumber);
-      }
-    }
-    // If the version query failed we don't have ground truth on which agents
-    // are live — fall back to returning everything so the user can still see
-    // the org, and surface the failure via `versionQueryFailed`.
-
-    // We used to drop agents with no Active version, but the connected-app
-    // integration user often has narrower BotVersion read access than the
-    // human running `sf` CLI. That meant agents like ProntoOrderSupport —
-    // which were genuinely active in the org — simply vanished here. Now we
-    // surface every definition we can read; activeVersion = 0 just means
-    // "we couldn't confirm an active version", not "there isn't one".
-    const agents = defs.records.map((d) => ({
-      id: d.Id,
-      label: d.MasterLabel || d.DeveloperName,
-      developerName: d.DeveloperName,
-      description: null,
-      agentType: d.AgentType,
-      activeVersion: activeByDef.get(d.Id) ?? 0,
-    }));
-
-    return Response.json({
-      ok: true,
-      instanceUrl,
-      agents,
-      versionQueryFailed: !versions.ok,
-      // Surface the count so the UI can hint when the version query came back
-      // empty (perms / sharing) vs definitions also being empty.
-      versionRowsSeen: versions.ok ? versions.records.length : 0,
-    });
-  } catch (err: any) {
-    if (err instanceof ConfigErrorThrown) {
-      return Response.json(err.payload, { status: 503 });
-    }
+  if (!defs.ok) {
     return Response.json(
-      { ok: false, error: err?.message || "internal error" },
-      { status: 500 },
+      {
+        ok: false,
+        error: `BotDefinition query failed`,
+        detail: defs.error,
+        hint:
+          /no\s+org/i.test(defs.error) || /no\s+default\s+org/i.test(defs.error)
+            ? `Run: sf org login web --alias ${TARGET_ORG} --set-default`
+            : `Verify the alias '${TARGET_ORG}' is authed: sf org list`,
+        targetOrg: TARGET_ORG,
+      },
+      { status: 502 },
     );
   }
+
+  if (defs.records.length === 0) {
+    return Response.json({ ok: true, agents: [], targetOrg: TARGET_ORG });
+  }
+
+  const ids = defs.records.map((d) => d.Id);
+  const versions = await sfQuery<{ BotDefinitionId: string; VersionNumber: number }>(VERSIONS_SOQL(ids));
+
+  const activeByDef = new Map<string, number>();
+  if (versions.ok) {
+    for (const v of versions.records) {
+      const cur = activeByDef.get(v.BotDefinitionId) ?? 0;
+      if (v.VersionNumber > cur) activeByDef.set(v.BotDefinitionId, v.VersionNumber);
+    }
+  }
+
+  const agents = defs.records.map((d) => ({
+    id: d.Id,
+    label: d.MasterLabel || d.DeveloperName,
+    developerName: d.DeveloperName,
+    description: null,
+    agentType: d.AgentType,
+    activeVersion: activeByDef.get(d.Id) ?? 0,
+  }));
+
+  return Response.json({
+    ok: true,
+    agents,
+    targetOrg: TARGET_ORG,
+    versionQueryFailed: !versions.ok,
+    versionRowsSeen: versions.ok ? versions.records.length : 0,
+  });
 }

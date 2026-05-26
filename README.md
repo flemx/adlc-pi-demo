@@ -8,7 +8,7 @@
   the path below. Suggested filename: hero.png  (or recording.gif).
 -->
 
-![Demo screenshot](presentation/public/images/hero.png)
+![Demo screenshot](demo.png)
 
 ---
 

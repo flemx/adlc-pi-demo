@@ -13,8 +13,8 @@ type Props = {
 };
 
 type ListResp =
-  | { ok: true; agents: AgentSummary[]; instanceUrl: string }
-  | { ok: false; error: string; hint?: string; missing?: string[] };
+  | { ok: true; agents: AgentSummary[]; instanceUrl?: string; targetOrg?: string }
+  | { ok: false; error: string; detail?: string; hint?: string; missing?: string[]; targetOrg?: string };
 
 export function AgentsPanel({
   active,
@@ -157,7 +157,7 @@ function ListSkeleton() {
 
 function ConfigEmpty({
   resp,
-}: { resp: { error: string; hint?: string; missing?: string[] } }) {
+}: { resp: { error: string; detail?: string; hint?: string; missing?: string[] } }) {
   const isConfigMiss = !!resp.missing?.length;
   return (
     <div className="agents-empty">
@@ -168,6 +168,9 @@ function ConfigEmpty({
       <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
         {resp.error}
       </div>
+      {resp.detail && (
+        <pre className="mono agents-env-snippet" style={{ marginTop: 10 }}>{resp.detail}</pre>
+      )}
       {resp.hint && (
         <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>{resp.hint}</div>
       )}
